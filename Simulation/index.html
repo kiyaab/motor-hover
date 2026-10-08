@@ -3,11 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>REAL RIDE 3D — Ultra Detailed Superbike Simulation & Highway Traffic</title>
+    <title>PROJECT REDLINE — Realistic Open-World Motorcycle Game & 100 Missions</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800;900&family=Inter:wght@400;600;700;800&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="three.min.js"></script>
+    <script>
+        if (typeof THREE === 'undefined') {
+            document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>');
+        }
+    </script>
     <style>
         :root {
             --red: #ef4444;
@@ -612,7 +617,8 @@
                 <div class="mode-row">
                     <span id="hud-level-text">MISSION 1 / 100</span>
                     <span class="badge-pill" id="hud-env-name">REDHAVEN CITY</span>
-                    <span id="hud-heat-level" style="color:var(--red); font-weight:800;">HEAT: ★☆☆☆☆</span>
+                    <span id="hud-traffic-count">TRAFFIC: MODERATE</span>
+                    <span id="hud-heat-level" style="color:var(--red); font-weight:800; margin-left:8px;">HEAT: ★☆☆☆☆</span>
                 </div>
             </div>
 
@@ -745,17 +751,17 @@
                 <button class="modal-close-btn" onclick="CloseModal('modal-levels')">&times;</button>
             </div>
             <div class="levels-nav-tabs">
-                <button class="lvl-tab active" onclick="FilterLevels('all')">ALL (1-100)</button>
-                <button class="lvl-tab" onclick="FilterLevels(1, 10)">CH 1: ROOKIE</button>
-                <button class="lvl-tab" onclick="FilterLevels(11, 20)">CH 2: UNDERGROUND</button>
-                <button class="lvl-tab" onclick="FilterLevels(21, 30)">CH 3: HARBOR DOCKS</button>
-                <button class="lvl-tab" onclick="FilterLevels(31, 40)">CH 4: NEON SYNDICATE</button>
-                <button class="lvl-tab" onclick="FilterLevels(41, 50)">CH 5: HAIRPINS</button>
-                <button class="lvl-tab" onclick="FilterLevels(51, 60)">CH 6: HIGHWAY OUTLAWS</button>
-                <button class="lvl-tab" onclick="FilterLevels(61, 70)">CH 7: DESERT RALLY</button>
-                <button class="lvl-tab" onclick="FilterLevels(71, 80)">CH 8: BETRAYAL</button>
-                <button class="lvl-tab" onclick="FilterLevels(81, 90)">CH 9: POLICE LOCKDOWN</button>
-                <button class="lvl-tab" onclick="FilterLevels(91, 100)">CH 10: APEX FINALS</button>
+                <button class="lvl-tab active" onclick="FilterLevels('all', null, this)">ALL (1-100)</button>
+                <button class="lvl-tab" onclick="FilterLevels(1, 10, this)">CH 1: ROOKIE</button>
+                <button class="lvl-tab" onclick="FilterLevels(11, 20, this)">CH 2: UNDERGROUND</button>
+                <button class="lvl-tab" onclick="FilterLevels(21, 30, this)">CH 3: HARBOR DOCKS</button>
+                <button class="lvl-tab" onclick="FilterLevels(31, 40, this)">CH 4: NEON SYNDICATE</button>
+                <button class="lvl-tab" onclick="FilterLevels(41, 50, this)">CH 5: HAIRPINS</button>
+                <button class="lvl-tab" onclick="FilterLevels(51, 60, this)">CH 6: HIGHWAY OUTLAWS</button>
+                <button class="lvl-tab" onclick="FilterLevels(61, 70, this)">CH 7: DESERT RALLY</button>
+                <button class="lvl-tab" onclick="FilterLevels(71, 80, this)">CH 8: BETRAYAL</button>
+                <button class="lvl-tab" onclick="FilterLevels(81, 90, this)">CH 9: POLICE LOCKDOWN</button>
+                <button class="lvl-tab" onclick="FilterLevels(91, 100, this)">CH 10: APEX FINALS</button>
             </div>
             <div class="levels-list-grid" id="levels-grid"></div>
             <div style="padding: 16px 28px; background: rgba(10, 14, 26, 0.9); display:flex; justify-content:space-between;">
@@ -844,6 +850,14 @@
 
         // Dynamic 3D Particle Systems
         let sparkParticles = [], smokeParticles = [];
+
+        // Materials & Customization
+        let fairingMat = null, helmetMat = null;
+
+        // Police Pursuit Subsystem (Heat Levels 1-5)
+        let currentHeatLevel = 1;
+        let heatScore = 0;
+        let sirenCooldown = 0.0;
 
         // Game & Level State
         let currentLevel = 1;
@@ -981,6 +995,7 @@
 
             window.addEventListener('resize', OnWindowResize);
             window.addEventListener('keydown', OnKeyDown);
+            window.addEventListener('pointerdown', () => { if (!audioCtx) InitAudio(); if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume(); });
             window.addEventListener('keyup', OnKeyUp);
 
             BuildLevelsGrid();
@@ -1023,7 +1038,7 @@
             // Sleek Aerodynamic Racing Fairing & Fuel Tank
             const fairingGeo = new THREE.ConeGeometry(0.44, 1.6, 6);
             fairingGeo.rotateX(Math.PI / 2);
-            const fairingMat = new THREE.MeshStandardMaterial({ color: 0xef4444, metalness: 0.7, roughness: 0.25 });
+            fairingMat = new THREE.MeshStandardMaterial({ color: 0xef4444, metalness: 0.7, roughness: 0.25 });
             const fairing = new THREE.Mesh(fairingGeo, fairingMat);
             fairing.position.set(0, 0.55, 0.45);
             chassisGroup.add(fairing);
@@ -1148,7 +1163,7 @@
             riderHead = new THREE.Group();
             riderHead.position.set(0, 0.46, 0.22);
             const helmetGeo = new THREE.SphereGeometry(0.18, 16, 16);
-            const helmetMat = new THREE.MeshStandardMaterial({ color: 0xef4444, metalness: 0.8, roughness: 0.2 });
+            helmetMat = new THREE.MeshStandardMaterial({ color: 0xef4444, metalness: 0.8, roughness: 0.2 });
             const helmet = new THREE.Mesh(helmetGeo, helmetMat);
             riderHead.add(helmet);
 
@@ -1288,9 +1303,15 @@
             sceneryProps.push(archGroup);
             scene.add(archGroup);
 
-            // 2. SPAWN 3D TRAFFIC VEHICLES (Cars, Trucks, SUVs)
+            // 2. SPAWN 3D TRAFFIC VEHICLES (Cars, Semi-Trucks, and Police Interceptors)
             const carColors = [0xef4444, 0x3b82f6, 0xe2e8f0, 0x111827, 0xf59e0b, 0x10b981];
             const laneOffsets = [-4.5, -1.5, 1.5, 4.5];
+
+            // Base heat calculated from chapter milestone (1 to 5)
+            currentHeatLevel = Math.min(5, Math.max(1, 1 + Math.floor((lvlNum - 1) / 20)));
+            heatScore = 0;
+            sirenCooldown = 0.0;
+            UpdateHeatDisplay();
 
             for (let i = 0; i < cfg.trafficCount; i++) {
                 const zPos = 120 + (i * (trackLength - 200) / cfg.trafficCount) + (Math.random() * 20);
@@ -1298,16 +1319,30 @@
                 const sample = SampleRoad(zPos, cfg);
 
                 const isTruck = (i % 6 === 0);
-                const car = isTruck ? BuildSemiTruck() : BuildTrafficCar(carColors[i % carColors.length]);
-                car.position.set(sample.x + lane, sample.y + 0.45, zPos);
-                scene.add(car);
+                const isPolice = !isTruck && (currentHeatLevel >= 2 || lvlNum >= 12) && (i % 3 === 1);
+
+                let carMesh, lightbar = null;
+                if (isTruck) {
+                    carMesh = BuildSemiTruck();
+                } else if (isPolice) {
+                    const policeObj = BuildPoliceCar();
+                    carMesh = policeObj.group;
+                    lightbar = policeObj.lightbar;
+                } else {
+                    carMesh = BuildTrafficCar(carColors[i % carColors.length]);
+                }
+
+                carMesh.position.set(sample.x + lane, sample.y + 0.45, zPos);
+                scene.add(carMesh);
 
                 trafficCars.push({
-                    mesh: car,
+                    mesh: carMesh,
                     laneOffset: lane,
                     z: zPos,
-                    speed: isTruck ? 14 : (18 + Math.random() * 12),
-                    passed: false
+                    speed: isTruck ? 14 : (isPolice ? 24 : (18 + Math.random() * 12)),
+                    passed: false,
+                    isPolice: isPolice,
+                    lightbar: lightbar
                 });
             }
 
@@ -1360,6 +1395,68 @@
             });
 
             return group;
+        }
+
+        // 3D Police Interceptor Cruiser with Dual Strobes
+        function BuildPoliceCar() {
+            const group = new THREE.Group();
+
+            // Interceptor Pursuit Body (Black & Carbon)
+            const bodyGeo = new THREE.BoxGeometry(2.0, 0.75, 4.4);
+            const bodyMat = new THREE.MeshStandardMaterial({ color: 0x0a0f1d, metalness: 0.9, roughness: 0.2 });
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            body.position.y = 0.55;
+            group.add(body);
+
+            // High-Contrast White Tactical Door Accent Panels
+            const doorGeo = new THREE.BoxGeometry(2.04, 0.5, 2.0);
+            const doorMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.35 });
+            const doors = new THREE.Mesh(doorGeo, doorMat);
+            doors.position.set(0, 0.6, 0);
+            group.add(doors);
+
+            // Dark Tinted Armored Glass Cabin
+            const cabinGeo = new THREE.BoxGeometry(1.7, 0.65, 2.3);
+            const cabinMat = new THREE.MeshStandardMaterial({ color: 0x020617, roughness: 0.1 });
+            const cabin = new THREE.Mesh(cabinGeo, cabinMat);
+            cabin.position.set(0, 1.1, -0.2);
+            group.add(cabin);
+
+            // Aerodynamic LED Lightbar Bridge
+            const barBaseGeo = new THREE.BoxGeometry(1.3, 0.08, 0.22);
+            const barBaseMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.95 });
+            const barBase = new THREE.Mesh(barBaseGeo, barBaseMat);
+            barBase.position.set(0, 1.48, -0.2);
+            group.add(barBase);
+
+            // High-Intensity Emergency Strobe Modules (Red Left / Blue Right)
+            const redStrobeGeo = new THREE.BoxGeometry(0.5, 0.12, 0.18);
+            const redStrobeMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
+            const redStrobe = new THREE.Mesh(redStrobeGeo, redStrobeMat);
+            redStrobe.position.set(-0.35, 1.54, -0.2);
+            group.add(redStrobe);
+
+            const blueStrobeGeo = new THREE.BoxGeometry(0.5, 0.12, 0.18);
+            const blueStrobeMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
+            const blueStrobe = new THREE.Mesh(blueStrobeGeo, blueStrobeMat);
+            blueStrobe.position.set(0.35, 1.54, -0.2);
+            group.add(blueStrobe);
+
+            // Pursuit High-Speed Tires
+            const wGeo = new THREE.CylinderGeometry(0.34, 0.34, 0.22, 16);
+            wGeo.rotateZ(Math.PI / 2);
+            const wMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.9 });
+            const wPositions = [[-1.0, 0.34, 1.3], [1.0, 0.34, 1.3], [-1.0, 0.34, -1.3], [1.0, 0.34, -1.3]];
+            wPositions.forEach(p => {
+                const w = new THREE.Mesh(wGeo, wMat);
+                w.position.set(p[0], p[1], p[2]);
+                group.add(w);
+            });
+
+            return {
+                group: group,
+                lightbar: { redMat: redStrobeMat, blueMat: blueStrobeMat }
+            };
         }
 
         // 3D Semi-Truck Model (Heavy Highway Rig)
@@ -1492,7 +1589,7 @@
             acceleration.copy(linearVelocity).sub(prevVelocity).divideScalar(dt);
             prevVelocity.copy(linearVelocity);
 
-            // Throttle & Nitro Drive
+            // Throttle, Bike Tuning & Nitro Drive
             let driveForce = 0;
             if (keys.throttle) {
                 const gearRatio = GearRatios[currentGear];
@@ -1500,13 +1597,23 @@
                 const engineTorque = Math.sin(Math.min(1.57, (currentRPM / 11000) * 1.57)) * 122.0;
                 driveForce = (engineTorque * totalRatio) / 0.31;
 
+                // Bike Model Performance Modifiers
+                if (currentBikeType === 1) driveForce *= 1.18; // V4 Factory Racer
+                else if (currentBikeType === 2) driveForce *= 1.48; // Turbo Hyper-Hover
+
                 if (isNitroActive) {
-                    driveForce *= 1.85;
+                    driveForce *= (currentBikeType === 2 ? 2.25 : 1.85);
                     nitroAmount = Math.max(0, nitroAmount - dt * 25);
                     if (nitroAmount <= 0) DeactivateNitro();
                 }
             } else {
                 nitroAmount = Math.min(100, nitroAmount + dt * 6);
+            }
+
+            // Speeding Violation Heat Escalation (> 180 km/h)
+            if (speedKmh > 180) {
+                heatScore += dt * 4.0;
+                CheckHeatEscalation();
             }
 
             let brakeForce = 0;
@@ -1547,7 +1654,8 @@
 
             const cfg = GetLevelConfig(currentLevel);
             const roadSample = SampleRoad(position.z, cfg);
-            position.y = THREE.MathUtils.lerp(position.y, roadSample.y + 0.35, 0.3);
+            const hoverOffset = (currentBikeType === 2) ? 0.38 + Math.sin(raceTimer * 7.0) * 0.05 : 0.0;
+            position.y = THREE.MathUtils.lerp(position.y, roadSample.y + 0.35 + hoverOffset, 0.3);
 
             const longAccel = acceleration.dot(forward);
             isWheelie = (longAccel > 6.5 && forwardSpeed > 3.0 && keys.throttle);
@@ -1615,12 +1723,29 @@
                 const distZ = Math.abs(position.z - car.z);
                 const distX = Math.abs(position.x - car.mesh.position.x);
 
+                // Police Strobe Flashing & Siren Sound
+                if (car.isPolice && car.lightbar) {
+                    const flash = Math.floor(raceTimer * 9) % 2 === 0;
+                    car.lightbar.redMat.color.setHex(flash ? 0xff1111 : 0x220000);
+                    car.lightbar.blueMat.color.setHex(flash ? 0x001133 : 0x00f0ff);
+
+                    if (Math.abs(position.z - car.z) < 70 && bAudioEnabled) {
+                        sirenCooldown -= dt;
+                        if (sirenCooldown <= 0) {
+                            PlaySound('siren');
+                            sirenCooldown = 0.75;
+                        }
+                    }
+                }
+
                 if (distZ < 3.2 && distX < 1.6) {
                     TriggerCrash();
                 } else if (!car.passed && distZ < 3.8 && distX < 2.8 && linearVelocity.length() * 3.6 > 100) {
                     car.passed = true;
                     closeCallsCount++;
                     score += 500;
+                    heatScore += 35;
+                    CheckHeatEscalation();
                     nitroAmount = Math.min(100, nitroAmount + 25);
                     ShowAlert("CLOSE CALL! +500 PTS");
                     PlaySound('whoosh');
@@ -1792,6 +1917,29 @@
             document.getElementById('sl-6').className = 'shift-light red' + (currentRPM > 14800 ? ' active' : '');
         }
 
+        // =================================================================
+        // POLICE PURSUIT HEAT SUBSYSTEM
+        // =================================================================
+        function CheckHeatEscalation() {
+            const chapterBaseHeat = Math.min(4, Math.floor((currentLevel - 1) / 20));
+            const accumulatedHeat = Math.floor(heatScore / 55);
+            const calculatedHeat = Math.min(5, Math.max(1, 1 + chapterBaseHeat + accumulatedHeat));
+            if (calculatedHeat > currentHeatLevel) {
+                currentHeatLevel = calculatedHeat;
+                ShowAlert(`PURSUIT ESCALATION! HEAT ★${currentHeatLevel}`);
+                PlaySound('siren');
+                UpdateHeatDisplay();
+            }
+        }
+
+        function UpdateHeatDisplay() {
+            const heatEl = document.getElementById('hud-heat-level');
+            if (heatEl) {
+                heatEl.innerText = `HEAT: ${"★".repeat(currentHeatLevel)}${"☆".repeat(5 - currentHeatLevel)}`;
+                heatEl.style.color = currentHeatLevel >= 4 ? '#ef4444' : (currentHeatLevel >= 3 ? '#f59e0b' : '#38bdf8');
+            }
+        }
+
         function ShowAlert(msg) {
             const el = document.getElementById('alert-popup');
             el.innerText = msg;
@@ -1839,9 +1987,10 @@
             }
         }
 
-        function FilterLevels(start, end) {
+        function FilterLevels(start, end, btn) {
             document.querySelectorAll('.lvl-tab').forEach(b => b.classList.remove('active'));
-            if (event && event.target) event.target.classList.add('active');
+            if (btn) btn.classList.add('active');
+            else if (typeof event !== 'undefined' && event && event.target) event.target.classList.add('active');
             if (start === 'all') BuildLevelsGrid(1, 100);
             else BuildLevelsGrid(start, end);
         }
@@ -1860,7 +2009,21 @@
                 const el = document.getElementById(`bike-card-${i}`);
                 if (el) el.classList.toggle('current', i === idx);
             }
-            ShowAlert("BIKE SELECTED!");
+            if (fairingMat && helmetMat) {
+                if (idx === 0) {
+                    fairingMat.color.setHex(0xef4444);
+                    helmetMat.color.setHex(0xef4444);
+                    ShowAlert("1000cc SUPERBIKE EQUIPPED (215 HP)");
+                } else if (idx === 1) {
+                    fairingMat.color.setHex(0x06b6d4);
+                    helmetMat.color.setHex(0x06b6d4);
+                    ShowAlert("V4 FACTORY RACER EQUIPPED (MOTOGP WINGLETS)");
+                } else if (idx === 2) {
+                    fairingMat.color.setHex(0x10b981);
+                    helmetMat.color.setHex(0xf59e0b);
+                    ShowAlert("TURBO HYPER-HOVER EQUIPPED (380 KM/H)");
+                }
+            }
         }
 
         function OpenModal(id) { document.getElementById(id).style.display = "flex"; bGamePaused = true; }
@@ -1949,6 +2112,14 @@
                     gain.gain.setValueAtTime(0.4, now);
                     gain.gain.linearRampToValueAtTime(0.01, now + 0.4);
                     osc.start(now); osc.stop(now + 0.4);
+                } else if (type === 'siren') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(650, now);
+                    osc.frequency.linearRampToValueAtTime(980, now + 0.35);
+                    osc.frequency.linearRampToValueAtTime(650, now + 0.7);
+                    gain.gain.setValueAtTime(0.22, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.7);
+                    osc.start(now); osc.stop(now + 0.7);
                 } else if (type === 'horn') {
                     osc.type = 'triangle';
                     osc.frequency.setValueAtTime(440, now);
