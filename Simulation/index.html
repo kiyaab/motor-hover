@@ -3,19 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>REAL RIDE 3D — Ultra Realistic Superbike Racing & Traffic Highway</title>
+    <title>REAL RIDE 3D — Ultra Detailed Superbike Simulation & Highway Traffic</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800;900&family=Inter:wght@400;600;700;800&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800;900&family=Inter:wght@400;600;700;800&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
         :root {
-            --accent-red: #ef4444;
-            --accent-gold: #f59e0b;
-            --accent-blue: #06b6d4;
-            --accent-green: #10b981;
-            --hud-bg: rgba(11, 15, 25, 0.82);
-            --hud-border: rgba(255, 255, 255, 0.14);
+            --red: #ef4444;
+            --gold: #f59e0b;
+            --blue: #06b6d4;
+            --green: #10b981;
+            --hud-bg: rgba(9, 14, 26, 0.88);
+            --hud-border: rgba(255, 255, 255, 0.16);
         }
 
         * {
@@ -28,7 +28,7 @@
 
         body {
             background-color: #030712;
-            color: #f9fafb;
+            color: #f8fafc;
             font-family: 'Rajdhani', sans-serif;
             overflow: hidden;
             width: 100vw;
@@ -44,7 +44,7 @@
             z-index: 1;
         }
 
-        /* Speed Blur & Nitro Screen Vignette */
+        /* High Speed & Nitro Motion Blur Vignette */
         #speed-vignette {
             position: absolute;
             top: 0;
@@ -55,21 +55,39 @@
             z-index: 5;
             opacity: 0;
             transition: opacity 0.2s ease-out;
-            background: radial-gradient(circle, transparent 45%, rgba(6, 182, 212, 0.2) 75%, rgba(239, 68, 68, 0.35) 100%);
-            box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.8);
+            background: radial-gradient(circle, transparent 40%, rgba(6, 182, 212, 0.25) 75%, rgba(239, 68, 68, 0.45) 100%);
+            box-shadow: inset 0 0 120px rgba(0, 0, 0, 0.85);
         }
 
         #speed-vignette.nitro {
             opacity: 1;
-            animation: nitroFlicker 0.15s infinite alternate;
+            animation: nitroPulse 0.12s infinite alternate;
         }
 
-        @keyframes nitroFlicker {
-            0% { filter: contrast(1.1) brightness(1.05); }
-            100% { filter: contrast(1.25) brightness(1.2); }
+        @keyframes nitroPulse {
+            0% { filter: contrast(1.15) brightness(1.08); transform: scale(1.0); }
+            100% { filter: contrast(1.35) brightness(1.22); transform: scale(1.015); }
         }
 
-        /* HUD Overlay */
+        /* Rain Screen Overlay */
+        #rain-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 6;
+            opacity: 0;
+            background: radial-gradient(circle, transparent 60%, rgba(2, 6, 23, 0.6) 100%);
+            transition: opacity 0.4s;
+        }
+
+        #rain-overlay.active {
+            opacity: 1;
+        }
+
+        /* In-Game HUD */
         #hud {
             position: absolute;
             top: 0;
@@ -112,7 +130,7 @@
             text-transform: uppercase;
         }
 
-        .mode-info {
+        .mode-row {
             display: flex;
             align-items: center;
             gap: 10px;
@@ -122,17 +140,18 @@
             color: #94a3b8;
         }
 
-        .mode-badge {
+        .badge-pill {
             background: rgba(239, 68, 68, 0.25);
-            border: 1px solid var(--accent-red);
+            border: 1px solid var(--red);
             color: #fff;
             padding: 2px 8px;
             border-radius: 4px;
             font-size: 0.75rem;
             letter-spacing: 1px;
+            text-transform: uppercase;
         }
 
-        /* Center Progress / Mission Tracker */
+        /* Center Mission Tracker */
         .mission-panel {
             background: var(--hud-bg);
             border: 1px solid var(--hud-border);
@@ -142,11 +161,11 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            min-width: 380px;
+            min-width: 400px;
             box-shadow: 0 8px 28px rgba(0, 0, 0, 0.6);
         }
 
-        .mission-label-row {
+        .mission-header {
             display: flex;
             justify-content: space-between;
             width: 100%;
@@ -156,7 +175,7 @@
             margin-bottom: 6px;
         }
 
-        .mission-progress-bar {
+        .progress-bar-bg {
             width: 100%;
             height: 10px;
             background: rgba(255, 255, 255, 0.1);
@@ -165,7 +184,7 @@
             border: 1px solid rgba(255, 255, 255, 0.15);
         }
 
-        .mission-progress-fill {
+        .progress-bar-fill {
             height: 100%;
             width: 0%;
             background: linear-gradient(90deg, #10b981, #f59e0b, #ef4444);
@@ -173,15 +192,15 @@
             transition: width 0.1s linear;
         }
 
-        /* Top Action Buttons */
+        /* Action Buttons */
         .hud-actions {
             display: flex;
-            gap: 10px;
+            gap: 8px;
             pointer-events: auto;
         }
 
-        .btn-game {
-            background: rgba(15, 23, 42, 0.85);
+        .btn-ui {
+            background: rgba(15, 23, 42, 0.88);
             border: 1px solid rgba(255, 255, 255, 0.2);
             color: #e2e8f0;
             padding: 8px 16px;
@@ -199,37 +218,37 @@
             gap: 6px;
         }
 
-        .btn-game:hover {
+        .btn-ui:hover {
             border-color: #fff;
             color: #fff;
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
         }
 
-        .btn-game.active {
+        .btn-ui.active {
             background: rgba(239, 68, 68, 0.3);
-            border-color: var(--accent-red);
+            border-color: var(--red);
             color: #fff;
         }
 
         .btn-nitro {
             background: linear-gradient(135deg, rgba(6, 182, 212, 0.35), rgba(239, 68, 68, 0.35));
-            border-color: var(--accent-blue);
+            border-color: var(--blue);
         }
 
-        /* Notifications & Adrenaline Popups */
-        #adrenaline-alert {
+        /* Adrenaline & Overtake Popups */
+        #alert-popup {
             position: absolute;
             top: 22%;
             left: 50%;
             transform: translate(-50%, -50%) scale(0.8);
             font-family: 'Orbitron', sans-serif;
-            font-size: 2.4rem;
+            font-size: 2.5rem;
             font-weight: 900;
             letter-spacing: 4px;
             text-transform: uppercase;
             color: #fff;
-            text-shadow: 0 0 25px #ef4444, 0 0 40px #f59e0b;
+            text-shadow: 0 0 25px var(--red), 0 0 40px var(--gold);
             opacity: 0;
             transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             pointer-events: none;
@@ -237,26 +256,25 @@
             text-align: center;
         }
 
-        #adrenaline-alert.show {
+        #alert-popup.show {
             opacity: 1;
             transform: translate(-50%, -50%) scale(1.1);
         }
 
-        /* Bottom Section: Real TFT Superbike Display */
+        /* Bottom Section: Telemetry & MotoGP TFT Display */
         .hud-bottom {
             display: flex;
             justify-content: space-between;
             align-items: flex-end;
         }
 
-        /* Telemetry & Physics Card */
         .telemetry-card {
             background: var(--hud-bg);
             border: 1px solid var(--hud-border);
             backdrop-filter: blur(16px);
             padding: 16px 22px;
             border-radius: 10px;
-            min-width: 240px;
+            min-width: 250px;
             box-shadow: 0 10px 32px rgba(0, 0, 0, 0.65);
         }
 
@@ -273,16 +291,16 @@
             margin-bottom: 0;
         }
 
-        .tele-val {
+        .val-num {
             font-family: 'Orbitron', sans-serif;
             font-weight: 700;
             color: #fff;
         }
 
-        .tele-val.gold { color: var(--accent-gold); }
-        .tele-val.red { color: var(--accent-red); }
-        .tele-val.green { color: var(--accent-green); }
-        .tele-val.blue { color: var(--accent-blue); }
+        .val-gold { color: var(--gold); }
+        .val-red { color: var(--red); }
+        .val-green { color: var(--green); }
+        .val-blue { color: var(--blue); }
 
         .nitro-bar-bg {
             width: 100%;
@@ -301,20 +319,19 @@
             transition: width 0.1s linear;
         }
 
-        /* Center 1000cc MotoGP TFT Dashboard */
+        /* Real MotoGP 1000cc TFT Cluster */
         .tft-cluster {
             display: flex;
             flex-direction: column;
             align-items: center;
-            background: rgba(10, 14, 26, 0.92);
+            background: rgba(10, 14, 26, 0.94);
             border: 2px solid rgba(255, 255, 255, 0.18);
             border-radius: 14px;
             padding: 16px 36px 14px;
             box-shadow: 0 0 50px rgba(0, 0, 0, 0.8), inset 0 0 20px rgba(255, 255, 255, 0.04);
-            min-width: 380px;
+            min-width: 390px;
         }
 
-        /* Shift Lights Sequence */
         .shift-lights-row {
             display: flex;
             gap: 10px;
@@ -327,14 +344,13 @@
             border-radius: 50%;
             background: rgba(255, 255, 255, 0.12);
             border: 1px solid rgba(255, 255, 255, 0.25);
-            transition: all 0.1s;
+            transition: all 0.08s;
         }
 
         .shift-light.green.active { background: #10b981; box-shadow: 0 0 14px #10b981; }
         .shift-light.yellow.active { background: #f59e0b; box-shadow: 0 0 14px #f59e0b; }
         .shift-light.red.active { background: #ef4444; box-shadow: 0 0 16px #ef4444; }
 
-        /* RPM Arch Bar */
         .tach-container {
             width: 100%;
             height: 12px;
@@ -351,7 +367,7 @@
             width: 20%;
             background: linear-gradient(90deg, #10b981 60%, #f59e0b 80%, #ef4444 100%);
             box-shadow: 0 0 15px rgba(239, 68, 68, 0.5);
-            transition: width 0.08s ease-out;
+            transition: width 0.06s ease-out;
         }
 
         .speed-gear-row {
@@ -364,9 +380,9 @@
 
         .gear-indicator {
             font-family: 'Orbitron', sans-serif;
-            font-size: 3.2rem;
+            font-size: 3.4rem;
             font-weight: 900;
-            color: var(--accent-gold);
+            color: var(--gold);
             line-height: 1;
             text-shadow: 0 0 18px rgba(245, 158, 11, 0.6);
         }
@@ -379,7 +395,7 @@
 
         .speed-val {
             font-family: 'Orbitron', sans-serif;
-            font-size: 5.2rem;
+            font-size: 5.4rem;
             font-weight: 900;
             line-height: 1;
             color: #ffffff;
@@ -389,7 +405,7 @@
 
         .speed-unit {
             font-family: 'Orbitron', sans-serif;
-            font-size: 1.25rem;
+            font-size: 1.3rem;
             font-weight: 800;
             color: #94a3b8;
         }
@@ -438,7 +454,7 @@
             border-radius: 14px;
             box-shadow: 0 0 60px rgba(0, 0, 0, 0.9);
             width: 95%;
-            max-width: 950px;
+            max-width: 960px;
             max-height: 90vh;
             display: flex;
             flex-direction: column;
@@ -477,9 +493,8 @@
             transition: color 0.2s;
         }
 
-        .modal-close-btn:hover { color: #ef4444; }
+        .modal-close-btn:hover { color: var(--red); }
 
-        /* Levels Grid */
         .levels-nav-tabs {
             display: flex;
             gap: 10px;
@@ -503,7 +518,7 @@
 
         .lvl-tab.active, .lvl-tab:hover {
             background: rgba(239, 68, 68, 0.3);
-            border-color: var(--accent-red);
+            border-color: var(--red);
             color: #fff;
         }
 
@@ -530,13 +545,13 @@
 
         .lvl-box:hover:not(.locked) {
             transform: translateY(-3px);
-            border-color: var(--accent-gold);
+            border-color: var(--gold);
             box-shadow: 0 0 15px rgba(245, 158, 11, 0.4);
             background: rgba(30, 41, 59, 0.95);
         }
 
         .lvl-box.current {
-            border: 2px solid var(--accent-red);
+            border: 2px solid var(--red);
             box-shadow: 0 0 18px rgba(239, 68, 68, 0.5);
         }
 
@@ -553,7 +568,7 @@
         }
 
         .lvl-box .stars {
-            color: var(--accent-gold);
+            color: var(--gold);
             font-size: 0.9rem;
             margin-top: 4px;
         }
@@ -564,38 +579,6 @@
             margin-top: 3px;
         }
 
-        /* Victory Popup */
-        .victory-panel {
-            text-align: center;
-            padding: 40px;
-            max-width: 550px;
-        }
-
-        .victory-title {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 2.8rem;
-            font-weight: 900;
-            background: linear-gradient(90deg, #f59e0b, #ef4444);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin-bottom: 6px;
-        }
-
-        .victory-stars {
-            font-size: 2.5rem;
-            color: var(--accent-gold);
-            margin: 16px 0;
-            text-shadow: 0 0 18px rgba(245, 158, 11, 0.8);
-        }
-
-        .stats-box {
-            background: rgba(0, 0, 0, 0.45);
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            border-radius: 8px;
-            padding: 16px 22px;
-            margin: 20px 0;
-        }
-
         /* Crash Banner */
         #crash-banner {
             position: absolute;
@@ -603,10 +586,10 @@
             left: 50%;
             transform: translate(-50%, -50%);
             font-family: 'Orbitron', sans-serif;
-            font-size: 3.5rem;
+            font-size: 3.6rem;
             font-weight: 900;
-            color: #ef4444;
-            text-shadow: 0 0 35px #ef4444;
+            color: var(--red);
+            text-shadow: 0 0 35px var(--red);
             display: none;
             z-index: 50;
             text-transform: uppercase;
@@ -616,52 +599,53 @@
 <body>
     <div id="canvas-container"></div>
     <div id="speed-vignette"></div>
-    <div id="adrenaline-alert">CLOSE CALL! +500 PTS</div>
-    <div id="crash-banner">CRASH! LOW-SIDE SLIDE</div>
+    <div id="rain-overlay"></div>
+    <div id="alert-popup">CLOSE CALL! +500 PTS</div>
+    <div id="crash-banner">CRASH! RECOVERING...</div>
 
     <!-- MAIN COCKPIT HUD -->
     <div id="hud">
-        <!-- Top Bar -->
+        <!-- Top Row -->
         <div class="hud-top">
             <div class="brand-panel">
                 <h1>REAL RIDE 3D</h1>
-                <div class="mode-info">
+                <div class="mode-row">
                     <span id="hud-level-text">LEVEL 1 / 100</span>
-                    <span class="mode-badge" id="hud-env-name">COASTAL HIGHWAY</span>
+                    <span class="badge-pill" id="hud-env-name">SUNNY HIGHWAY</span>
                     <span id="hud-traffic-count">TRAFFIC: MODERATE</span>
                 </div>
             </div>
 
-            <!-- Mission / Distance Progress -->
+            <!-- Distance & Mission Progress -->
             <div class="mission-panel">
-                <div class="mission-label-row">
+                <div class="mission-header">
                     <span id="hud-mission-desc">FINISH LINE DISTANCE</span>
                     <span id="hud-dist-val">1600m</span>
                     <span id="hud-pct-val">0%</span>
                 </div>
-                <div class="mission-progress-bar">
-                    <div class="mission-progress-fill" id="progress-fill"></div>
+                <div class="progress-bar-bg">
+                    <div class="progress-bar-fill" id="progress-fill"></div>
                 </div>
             </div>
 
-            <!-- Action Buttons -->
+            <!-- Action Controls -->
             <div class="hud-actions">
-                <button class="btn-game btn-nitro" id="btn-nitro" onclick="ActivateNitro()">⚡ NITRO (SHIFT)</button>
-                <button class="btn-game" id="btn-levels" onclick="OpenModal('modal-levels')">🏆 100 LEVELS</button>
-                <button class="btn-game" id="btn-bikes" onclick="OpenModal('modal-bikes')">🏍️ BIKES (V)</button>
-                <button class="btn-game" id="btn-cam" onclick="CycleCamera()">📷 CAM (C)</button>
-                <button class="btn-game" id="btn-env" onclick="CycleEnvironment()">☀️ ENV (E)</button>
-                <button class="btn-game" id="btn-audio" onclick="ToggleAudio()">🔊 AUDIO: ON</button>
+                <button class="btn-ui btn-nitro" id="btn-nitro" onclick="ActivateNitro()">⚡ NITRO (SHIFT)</button>
+                <button class="btn-ui" id="btn-levels" onclick="OpenModal('modal-levels')">🏆 100 LEVELS</button>
+                <button class="btn-ui" id="btn-bikes" onclick="OpenModal('modal-bikes')">🏍️ GARAGE (V)</button>
+                <button class="btn-ui" id="btn-cam" onclick="CycleCamera()">📷 CAM (C)</button>
+                <button class="btn-ui" id="btn-env" onclick="CycleEnvironment()">☀️ ENV (E)</button>
+                <button class="btn-ui" id="btn-audio" onclick="ToggleAudio()">🔊 AUDIO</button>
             </div>
         </div>
 
-        <!-- Bottom Bar: Telemetry + TFT Digital Dashboard -->
+        <!-- Bottom Row: Telemetry + 1000cc TFT Cockpit -->
         <div class="hud-bottom">
-            <!-- Left: Telemetry & Dynamic Grip -->
+            <!-- Left: Suspension, Sag & Grip Telemetry -->
             <div class="telemetry-card">
                 <div class="tele-row">
                     <span>NITRO BOOST:</span>
-                    <span class="tele-val blue" id="hud-nitro-val">100%</span>
+                    <span class="val-num val-blue" id="hud-nitro-val">100%</span>
                 </div>
                 <div class="nitro-bar-bg">
                     <div class="nitro-bar-fill" id="nitro-fill"></div>
@@ -669,23 +653,23 @@
 
                 <div class="tele-row" style="margin-top: 12px;">
                     <span>LEAN ANGLE:</span>
-                    <span class="tele-val gold" id="hud-lean-deg">0.0° / 58°</span>
+                    <span class="val-num val-gold" id="hud-lean-deg">0.0° / 58°</span>
                 </div>
                 <div class="tele-row">
-                    <span>WHEELIE / STOPPIE:</span>
-                    <span class="tele-val red" id="hud-stunt">NORMAL</span>
+                    <span>STUNT STATE:</span>
+                    <span class="val-num val-red" id="hud-stunt">NORMAL</span>
                 </div>
                 <div class="tele-row">
                     <span>CLOSE CALLS:</span>
-                    <span class="tele-val green" id="hud-close-calls">0 HITS</span>
+                    <span class="val-num val-green" id="hud-close-calls">0 HITS</span>
                 </div>
                 <div class="tele-row">
-                    <span>TIME:</span>
-                    <span class="tele-val" id="hud-time">00:00.0</span>
+                    <span>ELAPSED TIME:</span>
+                    <span class="val-num" id="hud-time">00:00.0</span>
                 </div>
             </div>
 
-            <!-- Center: 1000cc Racing TFT Display -->
+            <!-- Center: MotoGP TFT Digital Dashboard -->
             <div class="tft-cluster">
                 <!-- Shift Lights -->
                 <div class="shift-lights-row">
@@ -697,12 +681,12 @@
                     <div class="shift-light red" id="sl-6"></div>
                 </div>
 
-                <!-- Tachometer Bar (16,000 RPM) -->
+                <!-- Tachometer (16,000 RPM) -->
                 <div class="tach-container">
                     <div class="tach-fill" id="tach-bar"></div>
                 </div>
 
-                <!-- Main Speed & Gear -->
+                <!-- Speed & Gear Indicator -->
                 <div class="speed-gear-row">
                     <div class="gear-indicator" id="hud-gear">1</div>
                     <div class="speed-main">
@@ -711,7 +695,7 @@
                     </div>
                 </div>
 
-                <!-- Secondary Sub-Readouts -->
+                <!-- Secondary Cluster Data -->
                 <div class="tft-sub-row">
                     <div class="tft-sub-item">
                         <span>RPM</span>
@@ -719,7 +703,7 @@
                     </div>
                     <div class="tft-sub-item">
                         <span>SCORE</span>
-                        <span class="tft-sub-val" style="color:var(--accent-gold);" id="hud-score">0 PTS</span>
+                        <span class="tft-sub-val val-gold" id="hud-score">0 PTS</span>
                     </div>
                     <div class="tft-sub-item">
                         <span>CAMERA</span>
@@ -728,23 +712,23 @@
                 </div>
             </div>
 
-            <!-- Right: Controls & Targets -->
+            <!-- Right: Performance & Targets -->
             <div class="telemetry-card">
                 <div class="tele-row">
                     <span>TARGET TIME:</span>
-                    <span class="tele-val gold" id="hud-target-time">00:45.0</span>
+                    <span class="val-num val-gold" id="hud-target-time">00:45.0</span>
                 </div>
                 <div class="tele-row">
-                    <span>BEST TIME:</span>
-                    <span class="tele-val" id="hud-best-time">--:--.-</span>
+                    <span>BEST RECORD:</span>
+                    <span class="val-num" id="hud-best-time">--:--.-</span>
                 </div>
                 <div class="tele-row">
                     <span>THROTTLE:</span>
-                    <span class="tele-val green" id="hud-throttle">0%</span>
+                    <span class="val-num val-green" id="hud-throttle">0%</span>
                 </div>
                 <div class="tele-row">
                     <span>BRAKE:</span>
-                    <span class="tele-val red" id="hud-brake">0%</span>
+                    <span class="val-num val-red" id="hud-brake">0%</span>
                 </div>
                 <div class="tele-row" style="margin-top: 6px; font-size: 0.8rem; color: #94a3b8;">
                     <span>W/A/S/D • SHIFT: NITRO • H: HORN</span>
@@ -770,15 +754,15 @@
             </div>
             <div class="levels-list-grid" id="levels-grid"></div>
             <div style="padding: 16px 28px; background: rgba(10, 14, 26, 0.9); display:flex; justify-content:space-between;">
-                <button class="btn-game" onclick="UnlockAllLevelsDev()">🔓 UNLOCK ALL 100 LEVELS (DEV)</button>
-                <button class="btn-game active" onclick="CloseModal('modal-levels')">RESUME RIDE</button>
+                <button class="btn-ui" onclick="UnlockAllLevelsDev()">🔓 UNLOCK ALL 100 LEVELS</button>
+                <button class="btn-ui active" onclick="CloseModal('modal-levels')">RESUME RIDE</button>
             </div>
         </div>
     </div>
 
-    <!-- BIKES MODAL -->
+    <!-- GARAGE MODAL -->
     <div class="modal-bg" id="modal-bikes">
-        <div class="modal-dialog" style="max-width: 800px;">
+        <div class="modal-dialog" style="max-width: 820px;">
             <div class="modal-header">
                 <h2>SUPERBIKE GARAGE</h2>
                 <button class="modal-close-btn" onclick="CloseModal('modal-bikes')">&times;</button>
@@ -786,57 +770,59 @@
             <div style="padding: 24px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px;">
                 <div class="lvl-box current" onclick="SelectBike(0)" id="bike-card-0" style="padding: 20px; text-align: center;">
                     <div style="font-size: 2.2rem; margin-bottom: 8px;">🏍️</div>
-                    <div style="font-family:'Orbitron'; font-weight:700; color:#ef4444;">1000cc SUPERBIKE</div>
+                    <div style="font-family:'Orbitron'; font-weight:700; color:var(--red);">1000cc SUPERBIKE</div>
                     <div style="font-size:0.85rem; color:#94a3b8; margin:8px 0;">Inline-4 cylinder, 215 HP, 299 km/h top speed, authentic lean physics.</div>
-                    <div style="color:var(--accent-gold); font-size:0.85rem;">ACCEL: ★★★★★</div>
+                    <div style="color:var(--gold); font-size:0.85rem;">ACCEL: ★★★★★</div>
                 </div>
                 <div class="lvl-box" onclick="SelectBike(1)" id="bike-card-1" style="padding: 20px; text-align: center;">
                     <div style="font-size: 2.2rem; margin-bottom: 8px;">🏁</div>
-                    <div style="font-family:'Orbitron'; font-weight:700; color:#06b6d4;">V4 FACTORY RACER</div>
+                    <div style="font-family:'Orbitron'; font-weight:700; color:var(--blue);">V4 FACTORY RACER</div>
                     <div style="font-size:0.85rem; color:#94a3b8; margin:8px 0;">MotoGP aerodynamic winglets, carbon chassis, ultra-fast quickshifter.</div>
-                    <div style="color:var(--accent-gold); font-size:0.85rem;">CORNERING: ★★★★★</div>
+                    <div style="color:var(--gold); font-size:0.85rem;">CORNERING: ★★★★★</div>
                 </div>
                 <div class="lvl-box" onclick="SelectBike(2)" id="bike-card-2" style="padding: 20px; text-align: center;">
                     <div style="font-size: 2.2rem; margin-bottom: 8px;">🛸</div>
-                    <div style="font-family:'Orbitron'; font-weight:700; color:#10b981;">TURBO HYPER-HOVER</div>
+                    <div style="font-family:'Orbitron'; font-weight:700; color:var(--green);">TURBO HYPER-HOVER</div>
                     <div style="font-size:0.85rem; color:#94a3b8; margin:8px 0;">Experimental anti-gravity repulsors, zero wheel drag, supersonic boost.</div>
-                    <div style="color:var(--accent-gold); font-size:0.85rem;">TOP SPEED: 380 KM/H</div>
+                    <div style="color:var(--gold); font-size:0.85rem;">TOP SPEED: 380 KM/H</div>
                 </div>
             </div>
             <div style="padding: 16px 28px; background: rgba(10, 14, 26, 0.9); text-align: right;">
-                <button class="btn-game active" onclick="CloseModal('modal-bikes')">RIDE SELECTED BIKE</button>
+                <button class="btn-ui active" onclick="CloseModal('modal-bikes')">CONFIRM BIKE</button>
             </div>
         </div>
     </div>
 
-    <!-- VICTORY MODAL -->
+    <!-- LEVEL VICTORY MODAL -->
     <div class="modal-bg" id="modal-victory">
-        <div class="modal-dialog victory-panel">
-            <h2 class="victory-title">LEVEL COMPLETE!</h2>
-            <div style="font-family:'Orbitron'; letter-spacing:2px; color:var(--accent-gold);" id="victory-sub">LEVEL 1 CLEARED</div>
-            <div class="victory-stars" id="victory-stars">★★★</div>
-            <div class="stats-box">
+        <div class="modal-dialog" style="text-align: center; padding: 36px; max-width: 550px;">
+            <h2 style="font-family:'Orbitron'; font-size:2.8rem; font-weight:900; background:linear-gradient(90deg, #f59e0b, #ef4444); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">LEVEL CLEARED!</h2>
+            <div style="font-family:'Orbitron'; letter-spacing:2px; color:var(--gold); margin:8px 0;" id="victory-sub">LEVEL 1 COMPLETE</div>
+            <div style="font-size: 2.6rem; color:var(--gold); margin: 16px 0;" id="victory-stars">★★★</div>
+            
+            <div style="background:rgba(0,0,0,0.45); border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:16px 22px; margin:20px 0; text-align:left;">
                 <div class="tele-row">
                     <span>FINISH TIME:</span>
-                    <span class="tele-val gold" id="v-time">00:32.4</span>
+                    <span class="val-num val-gold" id="v-time">00:32.4</span>
                 </div>
                 <div class="tele-row">
                     <span>TOP SPEED:</span>
-                    <span class="tele-val blue" id="v-speed">294 KM/H</span>
+                    <span class="val-num val-blue" id="v-speed">294 KM/H</span>
                 </div>
                 <div class="tele-row">
                     <span>CLOSE CALLS:</span>
-                    <span class="tele-val green" id="v-calls">8 OVERTAKES</span>
+                    <span class="val-num val-green" id="v-calls">8 OVERTAKES</span>
                 </div>
                 <div class="tele-row">
                     <span>FINAL SCORE:</span>
-                    <span class="tele-val" id="v-score">14,200 PTS</span>
+                    <span class="val-num" id="v-score">14,200 PTS</span>
                 </div>
             </div>
+
             <div style="display:flex; gap:12px; justify-content:center;">
-                <button class="btn-game" onclick="RestartCurrentLevel()">↺ RETRY</button>
-                <button class="btn-game active" onclick="NextLevel()">NEXT LEVEL ➔</button>
-                <button class="btn-game" onclick="OpenModal('modal-levels')">🏆 LEVEL SELECT</button>
+                <button class="btn-ui" onclick="RestartCurrentLevel()">↺ RETRY</button>
+                <button class="btn-ui active" onclick="NextLevel()">NEXT LEVEL ➔</button>
+                <button class="btn-ui" onclick="OpenModal('modal-levels')">🏆 LEVEL SELECT</button>
             </div>
         </div>
     </div>
@@ -848,8 +834,11 @@
 
         let scene, camera, renderer;
         let bikeGroup, chassisGroup, frontForkGroup, frontWheelMesh, rearWheelMesh;
-        let riderGroup, riderTorso, riderHead, riderLeftLeg, riderRightLeg, riderLeftArm, riderRightArm;
-        let exhaustPipes = [], exhaustFlames = [];
+        let riderGroup, riderTorso, riderHead, riderLeftLeg, riderRightLeg;
+        let exhaustFlames = [];
+
+        // Dynamic 3D Particle Systems
+        let sparkParticles = [], smokeParticles = [];
 
         // Game & Level State
         let currentLevel = 1;
@@ -866,18 +855,18 @@
         let score = 0;
         let closeCallsCount = 0;
         let topSpeed = 0;
-        let currentBikeType = 0; // 0: Superbike 1000cc, 1: V4 Racer, 2: Hyper-Hover
+        let currentBikeType = 0; // 0: Superbike, 1: V4 Racer, 2: Hyper-Hover
 
         // Environments
         let currentEnvIndex = 0;
         const Environments = [
-            { name: "Sunny Coastal Highway", skyTop: 0x38bdf8, skyBottom: 0xe0f2fe, fog: 0xbae6fd, sun: 0xffedd5, asphalt: 0x1e293b, line: 0xf59e0b },
-            { name: "Sunset Mountain Pass", skyTop: 0x9333ea, skyBottom: 0xf97316, fog: 0xfdba74, sun: 0xffedd5, asphalt: 0x18181b, line: 0xf59e0b },
-            { name: "Tokyo Neon Expressway", skyTop: 0x050814, skyBottom: 0x0f172a, fog: 0x0f172a, sun: 0x00f0ff, asphalt: 0x090d16, line: 0x00f0ff }
+            { name: "Sunny Coastal Highway", skyTop: 0x38bdf8, skyBottom: 0xe0f2fe, fog: 0xbae6fd, sun: 0xffedd5, asphalt: 0x1e293b },
+            { name: "Sunset Canyon Pass", skyTop: 0x9333ea, skyBottom: 0xf97316, fog: 0xfdba74, sun: 0xffedd5, asphalt: 0x18181b },
+            { name: "Tokyo Neon Expressway", skyTop: 0x050814, skyBottom: 0x0f172a, fog: 0x0f172a, sun: 0x00f0ff, asphalt: 0x090d16 }
         ];
 
         // Track & Road State
-        let roadRibbonMesh, leftGuardrail, rightGuardrail;
+        let roadRibbonMesh;
         let trackLength = 1600;
         let finishLineZ = 1600;
         let trafficCars = [];
@@ -904,13 +893,11 @@
         let rearWheelRot = 0;
         let currentLeanDeg = 0.0;
         let targetLeanDeg = 0.0;
-        let frontForkCompress = 0.0;
-        let rearShockCompress = 0.0;
         let isWheelie = false;
         let isStoppie = false;
         let nitroAmount = 100.0;
         let isNitroActive = false;
-        let cameraMode = 0; // 0: Chase, 1: Cockpit FPV, 2: Knee-Down Onboard, 3: Drone
+        let cameraMode = 0; // 0: Chase, 1: Cockpit FPV, 2: Knee-Down, 3: Drone
 
         // Input
         const keys = {
@@ -924,11 +911,8 @@
         // Web Audio Synthesizer
         let audioCtx = null;
         let bAudioEnabled = false;
-        let engineOsc1 = null;
-        let engineOsc2 = null;
+        let engineOsc1 = null, engineOsc2 = null;
         let engineGain = null;
-        let windGain = null;
-        let windNoise = null;
 
         // Restore Progress
         try {
@@ -941,7 +925,7 @@
         } catch(e) {}
 
         // =================================================================
-        // LEVEL DATA FORMULA (1 TO 100)
+        // PROCEDURAL LEVEL CURVATURE FORMULA (1 TO 100)
         // =================================================================
         function GetLevelConfig(lvl) {
             const length = 1200 + lvl * 60; // 1260m to 7200m
@@ -1005,6 +989,7 @@
                 if (!bGamePaused) {
                     UpdatePhysics(dt);
                     UpdateTraffic(dt);
+                    UpdateParticles(dt);
                     UpdateCamera(dt);
                     UpdateHUD();
                     UpdateAudio();
@@ -1056,14 +1041,14 @@
                 chassisGroup.add(headlight);
             }
 
-            // Inline-4 Engine Block with Cooling Fins & Clutch Cover
+            // Inline-4 Engine Block
             const engineGeo = new THREE.BoxGeometry(0.42, 0.35, 0.6);
             const engineMat = new THREE.MeshStandardMaterial({ color: 0x111827, metalness: 0.95, roughness: 0.3 });
             const engine = new THREE.Mesh(engineGeo, engineMat);
             engine.position.set(0, 0.35, 0.05);
             chassisGroup.add(engine);
 
-            // Titanium Under-Tail / Side Exhaust
+            // Titanium Exhaust System
             const exhaustGeo = new THREE.CylinderGeometry(0.06, 0.08, 0.8, 12);
             exhaustGeo.rotateX(Math.PI / 2 + 0.2);
             const exhaustMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.95, roughness: 0.15 });
@@ -1071,7 +1056,7 @@
             exhaust.position.set(0.18, 0.32, -0.75);
             chassisGroup.add(exhaust);
 
-            // Nitro Exhaust Backfire Flame
+            // Nitro Exhaust Flame
             const flameGeo = new THREE.ConeGeometry(0.08, 0.65, 8);
             flameGeo.rotateX(-Math.PI / 2);
             const flameMat = new THREE.MeshBasicMaterial({ color: 0x06b6d4 });
@@ -1090,7 +1075,7 @@
                 const forkUpperMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.9, roughness: 0.2 });
                 const forkUpper = new THREE.Mesh(forkUpperGeo, forkUpperMat);
                 forkUpper.position.set(side, -0.05, 0);
-                forkUpper.rotation.x = -0.38; // Rake angle
+                forkUpper.rotation.x = -0.38;
                 frontForkGroup.add(forkUpper);
 
                 const forkSliderGeo = new THREE.CylinderGeometry(0.025, 0.025, 0.35, 12);
@@ -1101,7 +1086,7 @@
                 frontForkGroup.add(forkSlider);
             }
 
-            // Clip-on Handlebars & Mirrors
+            // Clip-on Handlebars
             const barGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.58, 8);
             barGeo.rotateZ(Math.PI / 2);
             const barMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.8 });
@@ -1109,7 +1094,7 @@
             bars.position.set(0, 0.12, -0.02);
             frontForkGroup.add(bars);
 
-            // Wheels & Tires (31cm radius)
+            // Rubber Tires
             const tireGeo = new THREE.CylinderGeometry(0.31, 0.31, 0.14, 24);
             tireGeo.rotateZ(Math.PI / 2);
             const tireMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.92, metalness: 0.08 });
@@ -1127,7 +1112,6 @@
                 disc.position.set(side, -0.24, -0.08);
                 frontForkGroup.add(disc);
             }
-
             chassisGroup.add(frontForkGroup);
 
             // 3. REAR SWINGARM & REAR WHEEL
@@ -1145,24 +1129,15 @@
             }
             chassisGroup.add(rearSwingarmGroup);
 
-            // 4. FULLY ARTICULATED 3D RIDER
+            // 4. ARTICULATED 3D RIDER
             riderGroup = new THREE.Group();
             riderGroup.position.set(0, 0.58, 0.08);
 
-            // Racing Leather Torso with Aerodynamic Aero-Hump
             const torsoGeo = new THREE.BoxGeometry(0.42, 0.52, 0.32);
             const suitMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.65 });
             riderTorso = new THREE.Mesh(torsoGeo, suitMat);
-            riderTorso.rotation.x = 0.52; // Forward lean
+            riderTorso.rotation.x = 0.52;
             riderGroup.add(riderTorso);
-
-            // Aero Back Hump
-            const humpGeo = new THREE.ConeGeometry(0.16, 0.42, 6);
-            humpGeo.rotateX(-Math.PI / 2 + 0.4);
-            const humpMat = new THREE.MeshStandardMaterial({ color: 0xef4444, metalness: 0.8 });
-            const hump = new THREE.Mesh(humpGeo, humpMat);
-            hump.position.set(0, 0.18, -0.15);
-            riderGroup.add(hump);
 
             // Helmet with Iridium Visor
             riderHead = new THREE.Group();
@@ -1212,7 +1187,6 @@
             trackLength = cfg.length;
             finishLineZ = cfg.length;
 
-            // Reset Game & Kinematics
             position.set(0, 0.45, 0);
             linearVelocity.set(0, 0, 0);
             rotation.set(0, 0, 0, 1);
@@ -1227,7 +1201,6 @@
             currentRPM = IdleRPM;
             document.getElementById('crash-banner').style.display = "none";
 
-            // Update UI
             document.getElementById('hud-level-text').innerText = `LEVEL ${lvlNum} / ${TotalLevels}`;
             document.getElementById('hud-target-time').innerText = FormatTime(cfg.targetTime);
             document.getElementById('hud-traffic-count').innerText = `TRAFFIC: ${cfg.trafficCount} CARS`;
@@ -1236,10 +1209,7 @@
 
             ApplyEnvironment(currentEnvIndex);
 
-            // Clear Old Meshes
             if (roadRibbonMesh) scene.remove(roadRibbonMesh);
-            if (leftGuardrail) scene.remove(leftGuardrail);
-            if (rightGuardrail) scene.remove(rightGuardrail);
             sceneryProps.forEach(p => scene.remove(p));
             sceneryProps = [];
             trafficCars.forEach(c => scene.remove(c.mesh));
@@ -1313,7 +1283,7 @@
             sceneryProps.push(archGroup);
             scene.add(archGroup);
 
-            // 2. SPAWN 3D HIGHWAY TRAFFIC CARS (Sedans, SUVs, Coupes)
+            // 2. SPAWN 3D TRAFFIC VEHICLES (Cars, Trucks, SUVs)
             const carColors = [0xef4444, 0x3b82f6, 0xe2e8f0, 0x111827, 0xf59e0b, 0x10b981];
             const laneOffsets = [-4.5, -1.5, 1.5, 4.5];
 
@@ -1322,7 +1292,8 @@
                 const lane = laneOffsets[i % laneOffsets.length];
                 const sample = SampleRoad(zPos, cfg);
 
-                const car = BuildTrafficCar(carColors[i % carColors.length]);
+                const isTruck = (i % 6 === 0);
+                const car = isTruck ? BuildSemiTruck() : BuildTrafficCar(carColors[i % carColors.length]);
                 car.position.set(sample.x + lane, sample.y + 0.45, zPos);
                 scene.add(car);
 
@@ -1330,12 +1301,12 @@
                     mesh: car,
                     laneOffset: lane,
                     z: zPos,
-                    speed: 18 + Math.random() * 12, // 65 - 110 km/h
+                    speed: isTruck ? 14 : (18 + Math.random() * 12),
                     passed: false
                 });
             }
 
-            // 3. 3D Mountain Rocks & Trees Along Highway
+            // 3. Highland Trees & Mountain Rocks
             for (let i = 0; i < 40; i++) {
                 const z = Math.random() * trackLength;
                 const sample = SampleRoad(z, cfg);
@@ -1357,7 +1328,6 @@
             const bodyMat = new THREE.MeshStandardMaterial({ color: colorHex, metalness: 0.8, roughness: 0.3 });
             const body = new THREE.Mesh(bodyGeo, bodyMat);
             body.position.y = 0.55;
-            body.castShadow = true;
             group.add(body);
 
             const cabinGeo = new THREE.BoxGeometry(1.7, 0.65, 2.3);
@@ -1366,7 +1336,6 @@
             cabin.position.set(0, 1.1, -0.2);
             group.add(cabin);
 
-            // Taillights
             for (let side of [-0.75, 0.75]) {
                 const tailGeo = new THREE.BoxGeometry(0.35, 0.15, 0.1);
                 const tailMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
@@ -1375,7 +1344,6 @@
                 group.add(tail);
             }
 
-            // Wheels
             const wGeo = new THREE.CylinderGeometry(0.34, 0.34, 0.22, 16);
             wGeo.rotateZ(Math.PI / 2);
             const wMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.9 });
@@ -1385,6 +1353,36 @@
                 w.position.set(p[0], p[1], p[2]);
                 group.add(w);
             });
+
+            return group;
+        }
+
+        // 3D Semi-Truck Model (Heavy Highway Rig)
+        function BuildSemiTruck() {
+            const group = new THREE.Group();
+
+            // Cab
+            const cabGeo = new THREE.BoxGeometry(2.4, 2.2, 3.2);
+            const cabMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.6 });
+            const cab = new THREE.Mesh(cabGeo, cabMat);
+            cab.position.set(0, 1.3, 3.0);
+            group.add(cab);
+
+            // Trailer
+            const trailerGeo = new THREE.BoxGeometry(2.4, 2.6, 7.5);
+            const trailerMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.4 });
+            const trailer = new THREE.Mesh(trailerGeo, trailerMat);
+            trailer.position.set(0, 1.6, -1.8);
+            group.add(trailer);
+
+            // Taillights
+            for (let side of [-1.0, 1.0]) {
+                const tailGeo = new THREE.BoxGeometry(0.4, 0.2, 0.1);
+                const tailMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
+                const tail = new THREE.Mesh(tailGeo, tailMat);
+                tail.position.set(side, 0.6, -5.55);
+                group.add(tail);
+            }
 
             return group;
         }
@@ -1406,14 +1404,43 @@
         }
 
         // =================================================================
-        // ENVIRONMENT & LIGHTING SWITCHER
+        // DYNAMIC PARTICLE EMITTERS (Sparks & Smoke)
+        // =================================================================
+        function EmitSparks(pos) {
+            const sparkGeo = new THREE.BoxGeometry(0.04, 0.04, 0.04);
+            const sparkMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b });
+            for (let i = 0; i < 2; i++) {
+                const s = new THREE.Mesh(sparkGeo, sparkMat);
+                s.position.copy(pos);
+                scene.add(s);
+                sparkParticles.push({
+                    mesh: s,
+                    vel: new THREE.Vector3((Math.random() - 0.5) * 4, Math.random() * 2 + 1, -Math.random() * 8),
+                    life: 0.25
+                });
+            }
+        }
+
+        function UpdateParticles(dt) {
+            for (let i = sparkParticles.length - 1; i >= 0; i--) {
+                const p = sparkParticles[i];
+                p.life -= dt;
+                p.mesh.position.addScaledVector(p.vel, dt);
+                if (p.life <= 0) {
+                    scene.remove(p.mesh);
+                    sparkParticles.splice(i, 1);
+                }
+            }
+        }
+
+        // =================================================================
+        // ENVIRONMENT & ATMOSPHERE SWITCHER
         // =================================================================
         function ApplyEnvironment(idx) {
             const env = Environments[idx];
             scene.background = new THREE.Color(env.skyTop);
             scene.fog = new THREE.FogExp2(env.fog, 0.0012);
 
-            // Clear old lights
             scene.children.filter(c => c.isLight).forEach(l => scene.remove(l));
 
             const ambient = new THREE.AmbientLight(0xffffff, 1.4);
@@ -1448,7 +1475,6 @@
 
             raceTimer += dt;
 
-            // Heading Vectors
             const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(rotation);
             const right = new THREE.Vector3(1, 0, 0).applyQuaternion(rotation);
             const up = new THREE.Vector3(0, 1, 0).applyQuaternion(rotation);
@@ -1461,13 +1487,13 @@
             acceleration.copy(linearVelocity).sub(prevVelocity).divideScalar(dt);
             prevVelocity.copy(linearVelocity);
 
-            // Throttle & Nitro Propulsion
+            // Throttle & Nitro Drive
             let driveForce = 0;
             if (keys.throttle) {
                 const gearRatio = GearRatios[currentGear];
                 const totalRatio = gearRatio * PrimaryDrive * FinalDrive;
                 const engineTorque = Math.sin(Math.min(1.57, (currentRPM / 11000) * 1.57)) * 122.0;
-                driveForce = (engineTorque * totalRatio) / 0.31; // F = T / r
+                driveForce = (engineTorque * totalRatio) / 0.31;
 
                 if (isNitroActive) {
                     driveForce *= 1.85;
@@ -1478,22 +1504,17 @@
                 nitroAmount = Math.min(100, nitroAmount + dt * 6);
             }
 
-            // Braking
             let brakeForce = 0;
-            if (keys.brake) {
-                brakeForce = 5800.0; // Dual front Brembos
-            }
+            if (keys.brake) brakeForce = 5800.0;
 
-            // Transmission & Automatic RPM
             const wheelRPM = (forwardSpeed / (2 * Math.PI * 0.31)) * 60.0;
             const targetRPM = Math.max(IdleRPM, Math.abs(wheelRPM * GearRatios[currentGear] * PrimaryDrive * FinalDrive));
             currentRPM = THREE.MathUtils.lerp(currentRPM, targetRPM, 0.22);
 
-            // Shift up/down
             if (currentRPM > 13800 && currentGear < 6) currentGear++;
             else if (currentRPM < 5500 && currentGear > 1) currentGear--;
 
-            // Lateral Steering & Dynamic 58° Knee-Down Lean: lean = atan(a_lat / g)
+            // Lateral Steering & Dynamic 58° Knee-Down Lean
             let steer = 0;
             if (keys.left) steer += 1.0;
             if (keys.right) steer -= 1.0;
@@ -1502,37 +1523,31 @@
             targetLeanDeg = -steer * 58.0 * speedNorm;
             currentLeanDeg = THREE.MathUtils.lerp(currentLeanDeg, targetLeanDeg, 0.16);
 
-            // Total Forces & Torques
+            // Forces
             const totalForces = new THREE.Vector3();
             if (driveForce > 0) totalForces.add(forward.clone().multiplyScalar(driveForce));
             if (brakeForce > 0 && speed > 0.1) totalForces.add(linearVelocity.clone().normalize().multiplyScalar(-brakeForce));
 
-            // Aerodynamic Drag (Cd*A * 0.5 * rho * v^2)
-            const cdA = (speedKmh > 160) ? 0.32 : 0.44; // Rider tuck
+            const cdA = (speedKmh > 160) ? 0.32 : 0.44;
             const dragMag = 0.5 * 1.2 * (speed * speed) * cdA;
             if (speed > 0.1) totalForces.add(linearVelocity.clone().normalize().multiplyScalar(-dragMag));
 
-            // Steering Yaw Integration
             const yawRate = steer * (3.2 - speedNorm * 1.4);
             const yawQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yawRate * dt);
             rotation.multiply(yawQ);
 
-            // Integrate Velocity & Position
-            const accel = totalForces.divideScalar(270.0); // 270 kg bike + rider
+            const accel = totalForces.divideScalar(270.0);
             linearVelocity.add(accel.multiplyScalar(dt));
             position.add(linearVelocity.clone().multiplyScalar(dt));
 
-            // Follow Road Surface Elevation & Camber
             const cfg = GetLevelConfig(currentLevel);
             const roadSample = SampleRoad(position.z, cfg);
             position.y = THREE.MathUtils.lerp(position.y, roadSample.y + 0.35, 0.3);
 
-            // Wheelies & Stoppies Logic
             const longAccel = acceleration.dot(forward);
             isWheelie = (longAccel > 6.5 && forwardSpeed > 3.0 && keys.throttle);
             isStoppie = (longAccel < -8.0 && forwardSpeed > 4.0 && keys.brake);
 
-            // Road Bounds Check (Keep on 16m highway or crash)
             const halfRoad = 7.5;
             if (Math.abs(position.x - roadSample.x) > halfRoad) {
                 position.x = roadSample.x + Math.sign(position.x - roadSample.x) * halfRoad;
@@ -1540,7 +1555,6 @@
                 if (speedKmh > 120) TriggerCrash();
             }
 
-            // Visual Articulation
             bikeGroup.position.copy(position);
 
             const rollQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), THREE.MathUtils.degToRad(currentLeanDeg));
@@ -1551,56 +1565,54 @@
             chassisGroup.quaternion.copy(rollQ).multiply(pitchQ);
             bikeGroup.quaternion.copy(rotation);
 
-            // Rotate Tires
             frontWheelRot += (forwardSpeed / 0.31) * dt;
             rearWheelRot += (forwardSpeed / 0.31) * dt;
             frontWheelMesh.rotation.x = frontWheelRot;
             rearWheelMesh.rotation.x = rearWheelRot;
 
-            // Turn Front Fork Steering
             frontForkGroup.rotation.y = THREE.MathUtils.lerp(frontForkGroup.rotation.y, steer * 0.28, 0.2);
 
-            // Rider Hang-Off Body & Knee-Down Extension
+            // Rider Hang-Off Body & Knee-Down Sparks
             const leanRatio = currentLeanDeg / 58.0;
             riderTorso.rotation.z = -leanRatio * 0.45;
             riderTorso.position.x = -leanRatio * 0.16;
 
-            if (currentLeanDeg > 28) riderRightLeg.rotation.z = THREE.MathUtils.degToRad(-35);
-            else if (currentLeanDeg < -28) riderLeftLeg.rotation.z = THREE.MathUtils.degToRad(35);
-            else { riderLeftLeg.rotation.z = 0; riderRightLeg.rotation.z = 0; }
+            if (currentLeanDeg > 28) {
+                riderRightLeg.rotation.z = THREE.MathUtils.degToRad(-35);
+                if (currentLeanDeg > 45) EmitSparks(position.clone().add(right.clone().multiplyScalar(0.4)));
+            } else if (currentLeanDeg < -28) {
+                riderLeftLeg.rotation.z = THREE.MathUtils.degToRad(35);
+                if (currentLeanDeg < -45) EmitSparks(position.clone().add(right.clone().multiplyScalar(-0.4)));
+            } else {
+                riderLeftLeg.rotation.z = 0;
+                riderRightLeg.rotation.z = 0;
+            }
 
-            // Rider Tuck-Down Behind Windscreen at High Speed
             const tuckAngle = (speedKmh > 160) ? 0.72 : 0.52;
             riderTorso.rotation.x = THREE.MathUtils.lerp(riderTorso.rotation.x, tuckAngle, 0.1);
 
-            // Check Finish Line
             if (position.z >= finishLineZ && !bRaceFinished) {
                 CompleteLevel();
             }
         }
 
         // =================================================================
-        // HIGHWAY TRAFFIC & NEAR-MISS CLOSE CALL SYSTEM
+        // TRAFFIC SIMULATION & NEAR-MISS CLOSE CALL SYSTEM
         // =================================================================
         function UpdateTraffic(dt) {
             const cfg = GetLevelConfig(currentLevel);
 
             trafficCars.forEach(car => {
-                // Move forward in lane
                 car.z += car.speed * dt;
                 const sample = SampleRoad(car.z, cfg);
                 car.mesh.position.set(sample.x + car.laneOffset, sample.y + 0.45, car.z);
 
-                // Near Miss / Close Call Check
                 const distZ = Math.abs(position.z - car.z);
                 const distX = Math.abs(position.x - car.mesh.position.x);
 
-                // Collision Detection
                 if (distZ < 3.2 && distX < 1.6) {
                     TriggerCrash();
-                }
-                // Near Miss Detection (Overtaking closely at high speed)
-                else if (!car.passed && distZ < 3.8 && distX < 2.8 && linearVelocity.length() * 3.6 > 100) {
+                } else if (!car.passed && distZ < 3.8 && distX < 2.8 && linearVelocity.length() * 3.6 > 100) {
                     car.passed = true;
                     closeCallsCount++;
                     score += 500;
@@ -1637,28 +1649,23 @@
             const speedKmh = linearVelocity.length() * 3.6;
 
             if (cameraMode === 0) {
-                // Dynamic Chase Cam with Authentic Roll-Tilt Delay
                 const boomDist = isWheelie ? 4.8 : (isNitroActive ? 4.5 : 3.8);
                 const camTarget = position.clone().sub(forward.clone().multiplyScalar(boomDist)).add(up.clone().multiplyScalar(1.5));
                 camera.position.lerp(camTarget, 0.16);
                 camera.lookAt(position.clone().add(forward.clone().multiplyScalar(8.0)));
 
-                // Dynamic FOV speed stretch
                 const targetFOV = THREE.MathUtils.lerp(76, 96, Math.min(1.0, speedKmh / 280.0));
                 camera.fov = THREE.MathUtils.lerp(camera.fov, targetFOV, 0.1);
                 camera.updateProjectionMatrix();
             } else if (cameraMode === 1) {
-                // First-Person Helmet / Cockpit Cam (True 3D Ride Experience)
                 const helmetPos = position.clone().add(up.clone().multiplyScalar(0.72)).add(forward.clone().multiplyScalar(0.25));
                 camera.position.copy(helmetPos);
                 camera.lookAt(helmetPos.clone().add(forward.clone().multiplyScalar(30.0)));
             } else if (cameraMode === 2) {
-                // Knee-Down Onboard Cam (Low to Asphalt)
                 const onboardPos = position.clone().add(up.clone().multiplyScalar(0.25)).add(forward.clone().multiplyScalar(0.8));
                 camera.position.copy(onboardPos);
                 camera.lookAt(onboardPos.clone().add(forward.clone().multiplyScalar(20.0)));
             } else {
-                // Helicopter / Drone Follow Cam
                 camera.position.set(position.x - 7, position.y + 6, position.z - 8);
                 camera.lookAt(position);
             }
@@ -1757,21 +1764,18 @@
             document.getElementById('hud-score').innerText = `${score} PTS`;
             document.getElementById('hud-lean-deg').innerText = `${Math.abs(currentLeanDeg).toFixed(1)}° / 58°`;
 
-            // Nitro Fill
             document.getElementById('nitro-fill').style.width = `${nitroAmount}%`;
             document.getElementById('hud-nitro-val').innerText = `${Math.round(nitroAmount)}%`;
 
-            // Stunt Readout
             const stuntEl = document.getElementById('hud-stunt');
-            if (isWheelie) { stuntEl.innerText = "WHEELIE!"; stuntEl.className = "tele-val red"; }
-            else if (isStoppie) { stuntEl.innerText = "STOPPIE!"; stuntEl.className = "tele-val red"; }
-            else { stuntEl.innerText = "NORMAL"; stuntEl.className = "tele-val"; }
+            if (isWheelie) { stuntEl.innerText = "WHEELIE!"; stuntEl.className = "val-num val-red"; }
+            else if (isStoppie) { stuntEl.innerText = "STOPPIE!"; stuntEl.className = "val-num val-red"; }
+            else { stuntEl.innerText = "NORMAL"; stuntEl.className = "val-num"; }
 
             document.getElementById('hud-close-calls').innerText = `${closeCallsCount} HITS`;
             document.getElementById('hud-throttle').innerText = keys.throttle ? "100%" : "0%";
             document.getElementById('hud-brake').innerText = keys.brake ? "100%" : "0%";
 
-            // Tachometer Bar & Shift Lights
             const rpmPct = (currentRPM - IdleRPM) / (MaxRPM - IdleRPM);
             document.getElementById('tach-bar').style.width = `${Math.min(100, Math.round(rpmPct * 100))}%`;
 
@@ -1784,7 +1788,7 @@
         }
 
         function ShowAlert(msg) {
-            const el = document.getElementById('adrenaline-alert');
+            const el = document.getElementById('alert-popup');
             el.innerText = msg;
             el.classList.add('show');
             setTimeout(() => el.classList.remove('show'), 1200);
