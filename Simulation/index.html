@@ -1,0 +1,1290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>REALMOTO GP — Realistic Superbike Physics Simulation</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body {
+            background-color: #0b111e;
+            color: #f8fafc;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        /* Modern Superbike Dashboard HUD */
+        #hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 24px 36px;
+        }
+
+        .hud-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .brand-badge {
+            background: rgba(15, 23, 42, 0.88);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(16px);
+            padding: 12px 24px;
+            border-radius: 8px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+        }
+
+        .brand-badge h1 {
+            font-size: 1.35rem;
+            font-weight: 900;
+            letter-spacing: 3px;
+            color: #ef4444;
+            text-transform: uppercase;
+            text-shadow: 0 0 12px rgba(239, 68, 68, 0.6);
+        }
+
+        .brand-badge .subtext {
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: #94a3b8;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            margin-top: 2px;
+        }
+
+        /* Top Action Buttons */
+        .action-buttons {
+            position: absolute;
+            top: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 12px;
+            pointer-events: auto;
+        }
+
+        .btn-ui {
+            background: rgba(30, 41, 59, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #f8fafc;
+            padding: 7px 16px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            cursor: pointer;
+            backdrop-filter: blur(12px);
+            transition: all 0.15s;
+        }
+
+        .btn-ui:hover {
+            background: rgba(239, 68, 68, 0.3);
+            border-color: #ef4444;
+            box-shadow: 0 0 14px rgba(239, 68, 68, 0.5);
+        }
+
+        /* Superbike TFT Color Dashboard (Bottom Center) */
+        .hud-bottom {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+
+        .tft-dashboard {
+            background: rgba(10, 15, 26, 0.95);
+            border: 2px solid #334155;
+            border-radius: 16px;
+            padding: 20px 28px;
+            backdrop-filter: blur(20px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.8), inset 0 0 20px rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            min-width: 460px;
+        }
+
+        /* RPM Tachometer Bar & Shift Lights */
+        .tachometer-container {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .shift-lights {
+            display: flex;
+            justify-content: space-between;
+            gap: 6px;
+            height: 8px;
+        }
+
+        .shift-light-dot {
+            flex: 1;
+            background: #1e293b;
+            border-radius: 2px;
+            transition: background 0.05s;
+        }
+
+        .shift-light-dot.green.on { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
+        .shift-light-dot.yellow.on { background: #eab308; box-shadow: 0 0 8px #eab308; }
+        .shift-light-dot.red.on { background: #ef4444; box-shadow: 0 0 10px #ef4444; }
+
+        .tach-scale {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.65rem;
+            font-weight: 800;
+            color: #64748b;
+            font-family: monospace;
+            padding: 0 4px;
+        }
+
+        .tach-bar-bg {
+            height: 16px;
+            background: #0f172a;
+            border-radius: 4px;
+            overflow: hidden;
+            border: 1px solid #334155;
+            position: relative;
+        }
+
+        .tach-bar-fill {
+            height: 100%;
+            width: 8%;
+            background: linear-gradient(90deg, #38bdf8 0%, #22c55e 60%, #eab308 85%, #ef4444 100%);
+            transition: width 0.04s linear;
+        }
+
+        /* Speed, Gear, Lean Readouts */
+        .dash-main-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .speed-display {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+        }
+
+        .speed-val {
+            font-size: 4.6rem;
+            font-weight: 900;
+            font-family: 'Courier New', monospace;
+            color: #ffffff;
+            line-height: 1;
+            text-shadow: 0 0 20px rgba(255, 255, 255, 0.4);
+        }
+
+        .speed-unit {
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: #94a3b8;
+        }
+
+        .gear-box {
+            background: #020617;
+            border: 2px solid #ef4444;
+            border-radius: 10px;
+            padding: 8px 24px;
+            text-align: center;
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.4);
+        }
+
+        .gear-box .gear-lbl {
+            font-size: 0.65rem;
+            font-weight: 800;
+            color: #94a3b8;
+            letter-spacing: 1px;
+        }
+
+        .gear-box .gear-num {
+            font-size: 3.2rem;
+            font-weight: 900;
+            color: #f8fafc;
+            line-height: 1;
+        }
+
+        .gear-box .gear-num.neutral { color: #22c55e; }
+
+        .dash-sub-stats {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            font-family: monospace;
+            font-size: 0.8rem;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        .stat-row .label { color: #64748b; font-weight: 700; }
+        .stat-row .val { color: #38bdf8; font-weight: 900; }
+        .val.warn { color: #eab308; }
+        .val.alert { color: #ef4444; }
+
+        /* Left / Right Brake Pressure Gauges */
+        .brake-bars {
+            display: flex;
+            gap: 12px;
+            margin-top: 4px;
+        }
+
+        .brake-bar-item {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .brake-bar-lbl {
+            font-size: 0.62rem;
+            font-weight: 800;
+            color: #94a3b8;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .brake-fill-bg {
+            height: 6px;
+            background: #1e293b;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .brake-fill {
+            height: 100%;
+            width: 0%;
+            background: #ef4444;
+            transition: width 0.05s ease-out;
+        }
+
+        .brake-fill.rear { background: #eab308; }
+
+        /* Suspension Telemetry Card */
+        .suspension-card {
+            background: rgba(15, 23, 42, 0.88);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(16px);
+            border-radius: 12px;
+            padding: 16px 22px;
+            min-width: 260px;
+            font-family: monospace;
+            font-size: 0.78rem;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .susp-header {
+            font-size: 0.7rem;
+            font-weight: 800;
+            color: #94a3b8;
+            text-transform: uppercase;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 4px;
+            margin-bottom: 2px;
+        }
+
+        /* Controls Help Box */
+        .controls-overlay {
+            position: absolute;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(10, 15, 26, 0.94);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            padding: 8px 22px;
+            font-size: 0.75rem;
+            color: #cbd5e1;
+            letter-spacing: 0.5px;
+            pointer-events: auto;
+            display: flex;
+            gap: 16px;
+            box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6);
+        }
+
+        .key-tag {
+            background: #1e293b;
+            color: #ef4444;
+            font-weight: 800;
+            padding: 2px 7px;
+            border-radius: 4px;
+            border: 1px solid #475569;
+        }
+
+        /* Crash Alert Banner */
+        .crash-banner {
+            position: absolute;
+            top: 35%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(239, 68, 68, 0.92);
+            color: #ffffff;
+            font-size: 2.2rem;
+            font-weight: 900;
+            letter-spacing: 4px;
+            padding: 14px 36px;
+            border-radius: 8px;
+            box-shadow: 0 0 50px rgba(239, 68, 68, 0.8);
+            display: none;
+            z-index: 50;
+            text-transform: uppercase;
+        }
+    </style>
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+    <div id="canvas-container"></div>
+
+    <div class="crash-banner" id="crash-banner">LOW-SIDE CRASH!</div>
+
+    <div id="hud">
+        <!-- Top Row -->
+        <div class="hud-header">
+            <div class="brand-badge">
+                <h1>REALMOTO GP</h1>
+                <div class="subtext">1000cc Superbike Physics Engine</div>
+            </div>
+
+            <div class="action-buttons">
+                <button class="btn-ui" id="btn-camera" onclick="CycleCamera()">Camera: Chase (C)</button>
+                <button class="btn-ui" id="btn-trans" onclick="ToggleTransmission()">Gearbox: AUTO (M)</button>
+                <button class="btn-ui" id="btn-audio" onclick="ToggleAudio()">Engine Audio: ON</button>
+                <button class="btn-ui" id="btn-reset" onclick="ResetBike()">Reset Bike (R)</button>
+            </div>
+
+            <div class="suspension-card">
+                <div class="susp-header">Telemetry & Contact</div>
+                <div class="stat-row">
+                    <span class="label">FRONT SAG:</span>
+                    <span class="val" id="hud-front-sag">3.5 cm</span>
+                </div>
+                <div class="stat-row">
+                    <span class="label">REAR SAG:</span>
+                    <span class="val" id="hud-rear-sag">3.0 cm</span>
+                </div>
+                <div class="stat-row">
+                    <span class="label">WHEELIE:</span>
+                    <span class="val" id="hud-wheelie">NO</span>
+                </div>
+                <div class="stat-row">
+                    <span class="label">STOPPIE:</span>
+                    <span class="val" id="hud-stoppie">NO</span>
+                </div>
+                <div class="stat-row">
+                    <span class="label">LEAN (ACT/MAX):</span>
+                    <span class="val" id="hud-lean">0° / 58°</span>
+                </div>
+                <div class="stat-row">
+                    <span class="label">SURFACE:</span>
+                    <span class="val highlight">DRY ASPHALT</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Superbike Dashboard -->
+        <div class="hud-bottom">
+            <div></div> <!-- Spacer -->
+
+            <div class="tft-dashboard">
+                <!-- Shift Lights -->
+                <div class="tachometer-container">
+                    <div class="shift-lights">
+                        <div class="shift-light-dot green" id="sl-1"></div>
+                        <div class="shift-light-dot green" id="sl-2"></div>
+                        <div class="shift-light-dot yellow" id="sl-3"></div>
+                        <div class="shift-light-dot yellow" id="sl-4"></div>
+                        <div class="shift-light-dot red" id="sl-5"></div>
+                        <div class="shift-light-dot red" id="sl-6"></div>
+                    </div>
+                    <div class="tach-bar-bg">
+                        <div class="tach-bar-fill" id="tach-fill"></div>
+                    </div>
+                    <div class="tach-scale">
+                        <span>0</span>
+                        <span>3</span>
+                        <span>6</span>
+                        <span>9</span>
+                        <span>12</span>
+                        <span>14</span>
+                        <span style="color: #ef4444;">16 RPM x1000</span>
+                    </div>
+                </div>
+
+                <!-- Main Speed & Gear Readout -->
+                <div class="dash-main-row">
+                    <div class="speed-display">
+                        <div class="speed-val" id="hud-speed">0</div>
+                        <div class="speed-unit">KM/H</div>
+                    </div>
+
+                    <div class="gear-box">
+                        <div class="gear-lbl">GEAR</div>
+                        <div class="gear-num" id="hud-gear">1</div>
+                    </div>
+
+                    <div class="dash-sub-stats">
+                        <div class="stat-row">
+                            <span class="label">RPM:</span>
+                            <span class="val" id="hud-rpm">1,200</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="label">LEAN:</span>
+                            <span class="val" id="hud-lean-deg">0.0°</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="label">THROTTLE:</span>
+                            <span class="val" id="hud-throttle">0%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Front & Rear Brake Pressure Bars -->
+                <div class="brake-bars">
+                    <div class="brake-bar-item">
+                        <div class="brake-bar-lbl"><span>FRONT DUAL DISC (S)</span><span id="front-brake-val">0%</span></div>
+                        <div class="brake-fill-bg"><div class="brake-fill" id="front-brake-bar"></div></div>
+                    </div>
+                    <div class="brake-bar-item">
+                        <div class="brake-bar-lbl"><span>REAR BRAKE (SPACE)</span><span id="rear-brake-val">0%</span></div>
+                        <div class="brake-fill-bg"><div class="brake-fill rear" id="rear-brake-bar"></div></div>
+                    </div>
+                </div>
+            </div>
+
+            <div></div> <!-- Spacer -->
+        </div>
+    </div>
+
+    <div class="controls-overlay">
+        <div><span class="key-tag">W</span> Throttle</div>
+        <div><span class="key-tag">S</span> Front Brake (Stoppie)</div>
+        <div><span class="key-tag">SPACE</span> Rear Brake (Slide)</div>
+        <div><span class="key-tag">A</span> / <span class="key-tag">D</span> Steer & Lean</div>
+        <div><span class="key-tag">SHIFT</span> Upshift</div>
+        <div><span class="key-tag">CTRL</span> Downshift</div>
+        <div><span class="key-tag">M</span> Auto / Manual</div>
+        <div><span class="key-tag">R</span> Reset</div>
+    </div>
+
+    <script>
+        // =================================================================
+        // REALMOTO GP — 2-WHEEL SUPERBIKE CHAOS PHYSICS ENGINE
+        // =================================================================
+
+        let scene, camera, renderer;
+        let bikeGroup, chassisMesh;
+        let frontForkGroup, frontWheelMesh, rearWheelMesh;
+        let riderGroup, riderTorso, riderLeftLeg, riderRightLeg;
+        let audioCtx, engineOsc, engineGain, filterNode;
+        let bAudioEnabled = false;
+
+        let cameraMode = 0; // 0 = Chase, 1 = Cockpit FPV, 2 = Drone
+        let bAutoTransmission = true;
+        let bCrashed = false;
+        let crashTimer = 0.0;
+
+        // Input Controls
+        const keys = {
+            throttle: false,
+            frontBrake: false,
+            rearBrake: false,
+            left: false,
+            right: false
+        };
+
+        // 1000cc Superbike Specifications
+        const BikeMass = 195.0; // kg
+        const RiderMass = 75.0; // kg
+        const TotalMass = BikeMass + RiderMass; // 270 kg
+        const Wheelbase = 1.44; // meters (144 cm)
+        const WheelRadius = 0.31; // meters (31 cm)
+        const CoMHeight = 0.56; // meters
+        const MaxLeanDeg = 58.0; // knee-down limit
+
+        // 6-Speed Sequential Transmission
+        const GearRatios = [0.0, 2.562, 2.052, 1.714, 1.500, 1.360, 1.269];
+        const PrimaryRatio = 1.681;
+        const FinalRatio = 2.625;
+        let currentGear = 1;
+
+        // Engine State
+        const IdleRPM = 1200.0;
+        const RedlineRPM = 14500.0;
+        const MaxRPM = 15200.0;
+        let currentRPM = IdleRPM;
+
+        // Kinematics & Physics State
+        let position = new THREE.Vector3(0, 0.45, -20);
+        let rotation = new THREE.Quaternion();
+        let linearVelocity = new THREE.Vector3(0, 0, 0);
+        let angularVelocity = new THREE.Vector3(0, 0, 0);
+        let acceleration = new THREE.Vector3(0, 0, 0);
+        let prevVelocity = new THREE.Vector3(0, 0, 0);
+
+        let frontWheelRot = 0;
+        let rearWheelRot = 0;
+        let frontSuspCompression = 0.035; // 3.5 cm static sag
+        let rearSuspCompression = 0.030;  // 3.0 cm static sag
+        let currentLeanDeg = 0.0;
+        let targetLeanDeg = 0.0;
+        let isWheelie = false;
+        let isStoppie = false;
+
+        // -------------------------------------------------------------
+        // MOUNTAIN ROAD ELEVATION & HIGHWAY GEOMETRY
+        // -------------------------------------------------------------
+        function SampleRoadSurface(worldPos) {
+            const x = worldPos.x;
+            const z = worldPos.z;
+
+            // Ethiopian Highland Mountain Highway Track:
+            // High scenic cliffs, mountain road with elevation curves
+            let roadY = 0.0;
+            let normal = new THREE.Vector3(0, 1, 0);
+
+            // Mountain Pass Incline (Z from 100 to 500)
+            if (z > 100 && z < 600) {
+                roadY = Math.sin((z - 100) * 0.006) * 18.0;
+                normal.set(0, 1, -Math.cos((z - 100) * 0.006) * 0.1).normalize();
+            } else if (z >= 600 && z <= 1200) {
+                roadY = 18.0 - ((z - 600) * 0.015);
+            }
+
+            // Road lateral profile: camber crown in center
+            roadY -= Math.pow(Math.abs(x) / 10.0, 2) * 0.08;
+
+            return {
+                height: roadY,
+                normal: normal
+            };
+        }
+
+        // -------------------------------------------------------------
+        // INITIALIZATION
+        // -------------------------------------------------------------
+        function Init() {
+            const container = document.getElementById('canvas-container');
+
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0f172a);
+            scene.fog = new THREE.FogExp2(0x1e293b, 0.0018);
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2500);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.25;
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            // Lighting: Natural Mountain Sunlight + Highland Sky
+            const ambient = new THREE.AmbientLight(0x334155, 1.8);
+            scene.add(ambient);
+
+            const sun = new THREE.DirectionalLight(0xfff7ed, 2.8);
+            sun.position.set(-150, 250, 100);
+            sun.castShadow = true;
+            sun.shadow.mapSize.width = 2048;
+            sun.shadow.mapSize.height = 2048;
+            scene.add(sun);
+
+            BuildMountainHighway();
+            BuildDetailedSuperbike();
+
+            window.addEventListener('resize', OnWindowResize);
+            window.addEventListener('keydown', OnKeyDown);
+            window.addEventListener('keyup', OnKeyUp);
+
+            let lastTime = performance.now();
+            function Animate(currentTime) {
+                requestAnimationFrame(Animate);
+                const dt = Math.min((currentTime - lastTime) / 1000.0, 0.0333);
+                lastTime = currentTime;
+
+                SimulateMotorcyclePhysics(dt);
+                UpdateVisuals(dt);
+                UpdateAudio();
+                UpdateHUD();
+
+                renderer.render(scene, camera);
+            }
+            requestAnimationFrame(Animate);
+        }
+
+        // -------------------------------------------------------------
+        // PROCEDURAL MOUNTAIN HIGHWAY ENVIRONMENT
+        // -------------------------------------------------------------
+        function BuildMountainHighway() {
+            // 2-Lane Realistic Asphalt Highway Ribbon
+            const roadGeo = new THREE.PlaneGeometry(16, 1600, 16, 200);
+            const posAttr = roadGeo.attributes.position;
+            for (let i = 0; i < posAttr.count; i++) {
+                const z = posAttr.getY(i) + 700; // plane geometry Y is road Z
+                const x = posAttr.getX(i);
+                const s = SampleRoadSurface(new THREE.Vector3(x, 0, z));
+                posAttr.setZ(i, -s.height); // road surface elevation
+            }
+            roadGeo.computeVertexNormals();
+
+            const roadMat = new THREE.MeshStandardMaterial({
+                color: 0x1e2530,
+                roughness: 0.85,
+                metalness: 0.15
+            });
+            const road = new THREE.Mesh(roadGeo, roadMat);
+            road.rotation.x = -Math.PI / 2;
+            road.position.set(0, 0, 700);
+            road.receiveShadow = true;
+            scene.add(road);
+
+            // Double Yellow Center Line
+            const lineGeo = new THREE.BoxGeometry(0.25, 0.02, 1600);
+            const lineMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b });
+            const line1 = new THREE.Mesh(lineGeo, lineMat);
+            line1.position.set(-0.2, 0.05, 700);
+            scene.add(line1);
+
+            const line2 = new THREE.Mesh(lineGeo, lineMat);
+            line2.position.set(0.2, 0.05, 700);
+            scene.add(line2);
+
+            // Steel Guardrails Along Mountain Cliffs
+            for (let side of [-8.5, 8.5]) {
+                const railGeo = new THREE.BoxGeometry(0.3, 0.8, 1600);
+                const railMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.9, roughness: 0.3 });
+                const rail = new THREE.Mesh(railGeo, railMat);
+                rail.position.set(side, 0.5, 700);
+                scene.add(rail);
+            }
+
+            // Mountain Valley Terrain & Rocks
+            for (let i = 0; i < 40; i++) {
+                const rockGeo = new THREE.DodecahedronGeometry(8 + Math.random() * 18, 1);
+                const rockMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.95 });
+                const rock = new THREE.Mesh(rockGeo, rockMat);
+                const side = (i % 2 === 0) ? -1 : 1;
+                rock.position.set(side * (30 + Math.random() * 40), -4 + Math.random() * 15, Math.random() * 1400);
+                scene.add(rock);
+            }
+
+            // Highland Trees (Pine / Acacia styling)
+            for (let i = 0; i < 60; i++) {
+                const trunkGeo = new THREE.CylinderGeometry(0.3, 0.5, 4, 8);
+                const trunkMat = new THREE.MeshStandardMaterial({ color: 0x451a03 });
+                const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+
+                const foliageGeo = new THREE.ConeGeometry(2.5, 7, 8);
+                const foliageMat = new THREE.MeshStandardMaterial({ color: 0x166534, roughness: 0.8 });
+                const foliage = new THREE.Mesh(foliageGeo, foliageMat);
+                foliage.position.y = 4.5;
+
+                const tree = new THREE.Group();
+                tree.add(trunk);
+                tree.add(foliage);
+
+                const side = (i % 2 === 0) ? -1 : 1;
+                tree.position.set(side * (18 + Math.random() * 35), 0, Math.random() * 1400);
+                scene.add(tree);
+            }
+
+            // Mountain Highway Tunnel
+            const tunnelGeo = new THREE.CylinderGeometry(14, 14, 80, 24, 1, true, 0, Math.PI);
+            const tunnelMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.9, side: THREE.BackSide });
+            const tunnel = new THREE.Mesh(tunnelGeo, tunnelMat);
+            tunnel.rotation.z = Math.PI / 2;
+            tunnel.position.set(0, 0, 480);
+            scene.add(tunnel);
+        }
+
+        // -------------------------------------------------------------
+        // DETAILED 1000CC RACING MOTORCYCLE & RIDER
+        // -------------------------------------------------------------
+        function BuildDetailedSuperbike() {
+            bikeGroup = new THREE.Group();
+
+            // 1. Twin-Spar Aluminum Perimeter Chassis & Engine Block
+            const frameGeo = new THREE.BoxGeometry(0.38, 0.45, 1.2);
+            const frameMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.9, roughness: 0.2 });
+            chassisMesh = new THREE.Mesh(frameGeo, frameMat);
+            chassisMesh.position.y = 0.45;
+            bikeGroup.add(chassisMesh);
+
+            // Engine Block with Exhaust Headers
+            const engineGeo = new THREE.BoxGeometry(0.42, 0.35, 0.55);
+            const engineMat = new THREE.MeshStandardMaterial({ color: 0x111827, metalness: 0.95 });
+            const engine = new THREE.Mesh(engineGeo, engineMat);
+            engine.position.set(0, 0.32, 0.0);
+            bikeGroup.add(engine);
+
+            // Aerodynamic Race Fairing & Fuel Tank (Red Superbike Styling)
+            const tankGeo = new THREE.ConeGeometry(0.38, 1.1, 8);
+            const fairingMat = new THREE.MeshStandardMaterial({ color: 0xdc2626, metalness: 0.4, roughness: 0.2 });
+            const tank = new THREE.Mesh(tankGeo, fairingMat);
+            tank.rotation.x = Math.PI / 2;
+            tank.position.set(0, 0.68, 0.2);
+            bikeGroup.add(tank);
+
+            // Windscreen Visor
+            const visorGeo = new THREE.BoxGeometry(0.32, 0.22, 0.4);
+            const visorMat = new THREE.MeshPhysicalMaterial({ color: 0x0284c7, transmission: 0.8, roughness: 0.1 });
+            const visor = new THREE.Mesh(visorGeo, visorMat);
+            visor.rotation.x = -0.4;
+            visor.position.set(0, 0.85, 0.65);
+            bikeGroup.add(visor);
+
+            // Titanium Exhaust Pipe
+            const pipeGeo = new THREE.CylinderGeometry(0.06, 0.08, 0.9, 12);
+            const pipeMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.9 });
+            const pipe = new THREE.Mesh(pipeGeo, pipeMat);
+            pipe.rotation.x = 1.2;
+            pipe.position.set(0.24, 0.35, -0.65);
+            bikeGroup.add(pipe);
+
+            // 2. FRONT WHEEL & FORK ASSEMBLY (Wheelbase = 1.44m -> Axle at +0.72m)
+            frontForkGroup = new THREE.Group();
+            frontForkGroup.position.set(0, 0.45, 0.72);
+
+            // Inverted Gold Anodized Telescopic Fork Stanchions
+            for (let side of [-0.14, 0.14]) {
+                const forkGeo = new THREE.CylinderGeometry(0.032, 0.032, 0.75, 12);
+                const forkMat = new THREE.MeshStandardMaterial({ color: 0xeab308, metalness: 0.9, roughness: 0.2 });
+                const fork = new THREE.Mesh(forkGeo, forkMat);
+                fork.rotation.x = -0.4; // 24-degree rake angle
+                fork.position.set(side, -0.05, 0);
+                frontForkGroup.add(fork);
+            }
+
+            // Clip-on Handlebars
+            const barGeo = new THREE.BoxGeometry(0.72, 0.04, 0.04);
+            const bar = new THREE.Mesh(barGeo, frameMat);
+            bar.position.set(0, 0.28, -0.08);
+            frontForkGroup.add(bar);
+
+            // Front 17-inch Alloy Rim & Rubber Tire
+            const tireGeo = new THREE.TorusGeometry(WheelRadius, 0.065, 16, 32);
+            const tireMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.95 });
+            frontWheelMesh = new THREE.Mesh(tireGeo, tireMat);
+            frontWheelMesh.rotation.y = Math.PI / 2;
+            frontWheelMesh.position.set(0, -0.14, 0);
+            frontForkGroup.add(frontWheelMesh);
+
+            // Front Dual Drilled Brake Discs + Gold Calipers
+            for (let side of [-0.08, 0.08]) {
+                const discGeo = new THREE.CylinderGeometry(0.18, 0.18, 0.015, 24);
+                const discMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.9 });
+                const disc = new THREE.Mesh(discGeo, discMat);
+                disc.rotation.z = Math.PI / 2;
+                disc.position.set(side, -0.14, 0);
+                frontForkGroup.add(disc);
+            }
+
+            bikeGroup.add(frontForkGroup);
+
+            // 3. REAR WHEEL & SWINGARM ASSEMBLY (Axle at -0.72m)
+            const rearWheelGroup = new THREE.Group();
+            rearWheelGroup.position.set(0, 0.31, -0.72);
+
+            rearWheelMesh = new THREE.Mesh(tireGeo, tireMat);
+            rearWheelMesh.rotation.y = Math.PI / 2;
+            rearWheelGroup.add(rearWheelMesh);
+
+            // Rear Swingarm Beams
+            for (let side of [-0.14, 0.14]) {
+                const armGeo = new THREE.BoxGeometry(0.04, 0.08, 0.72);
+                const arm = new THREE.Mesh(armGeo, frameMat);
+                arm.position.set(side, 0.05, 0.36);
+                rearWheelGroup.add(arm);
+            }
+
+            bikeGroup.add(rearWheelGroup);
+
+            // 4. REALISTIC 3D MOTORCYCLE RIDER
+            riderGroup = new THREE.Group();
+            riderGroup.position.set(0, 0.55, 0.05);
+
+            // Torso / Leather Racing Suit
+            const torsoGeo = new THREE.BoxGeometry(0.42, 0.55, 0.32);
+            const suitMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.6 });
+            riderTorso = new THREE.Mesh(torsoGeo, suitMat);
+            riderTorso.rotation.x = 0.55; // Seated lean forward
+            riderGroup.add(riderTorso);
+
+            // Racing Helmet
+            const helmetGeo = new THREE.SphereGeometry(0.18, 16, 16);
+            const helmetMat = new THREE.MeshStandardMaterial({ color: 0xef4444, metalness: 0.7, roughness: 0.2 });
+            const helmet = new THREE.Mesh(helmetGeo, helmetMat);
+            helmet.position.set(0, 0.46, 0.22);
+            riderGroup.add(helmet);
+
+            // Rider Arms Holding Handlebars
+            for (let side of [-0.22, 0.22]) {
+                const armGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.45, 8);
+                const arm = new THREE.Mesh(armGeo, suitMat);
+                arm.rotation.x = 0.9;
+                arm.rotation.z = side * 0.35;
+                arm.position.set(side * 1.1, 0.22, 0.26);
+                riderGroup.add(arm);
+            }
+
+            // Rider Legs & Knee Sliders
+            riderLeftLeg = new THREE.Group();
+            riderRightLeg = new THREE.Group();
+
+            const legGeo = new THREE.BoxGeometry(0.12, 0.42, 0.16);
+            const leftLegMesh = new THREE.Mesh(legGeo, suitMat);
+            leftLegMesh.rotation.x = -0.5;
+            riderLeftLeg.add(leftLegMesh);
+            riderLeftLeg.position.set(-0.25, -0.15, -0.05);
+            riderGroup.add(riderLeftLeg);
+
+            const rightLegMesh = new THREE.Mesh(legGeo, suitMat);
+            rightLegMesh.rotation.x = -0.5;
+            riderRightLeg.add(rightLegMesh);
+            riderRightLeg.position.set(0.25, -0.15, -0.05);
+            riderGroup.add(riderRightLeg);
+
+            bikeGroup.add(riderGroup);
+            scene.add(bikeGroup);
+        }
+
+        // -------------------------------------------------------------
+        // AUDIO ENGINE (Web Audio API 4-Cylinder Superbike Synthesizer)
+        // -------------------------------------------------------------
+        function InitAudio() {
+            if (audioCtx) return;
+            try {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+                engineOsc = audioCtx.createOscillator();
+                engineOsc.type = 'sawtooth';
+                engineOsc.frequency.setValueAtTime(60, audioCtx.currentTime);
+
+                filterNode = audioCtx.createBiquadFilter();
+                filterNode.type = 'lowpass';
+                filterNode.frequency.setValueAtTime(600, audioCtx.currentTime);
+
+                engineGain = audioCtx.createGain();
+                engineGain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+
+                engineOsc.connect(filterNode);
+                filterNode.connect(engineGain);
+                engineGain.connect(audioCtx.destination);
+                engineOsc.start();
+                bAudioEnabled = true;
+                document.getElementById('btn-audio').innerText = "Engine Audio: ON";
+            } catch (e) {
+                console.log("Web Audio not supported or blocked");
+            }
+        }
+
+        function UpdateAudio() {
+            if (!bAudioEnabled || !audioCtx || !engineOsc) return;
+
+            // Pitch frequency proportional to 4-cylinder firing rate (RPM / 60 * 2)
+            const targetFreq = Math.max(45, (currentRPM / 60.0) * 1.8);
+            engineOsc.frequency.setTargetAtTime(targetFreq, audioCtx.currentTime, 0.05);
+
+            // Filter cut-off opens with throttle
+            const throttleVal = keys.throttle ? 1.0 : 0.1;
+            filterNode.frequency.setTargetAtTime(400 + throttleVal * 2800, audioCtx.currentTime, 0.05);
+        }
+
+        function ToggleAudio() {
+            if (!audioCtx) {
+                InitAudio();
+            } else {
+                if (bAudioEnabled) {
+                    engineGain.gain.setValueAtTime(0, audioCtx.currentTime);
+                    bAudioEnabled = false;
+                    document.getElementById('btn-audio').innerText = "Engine Audio: OFF";
+                } else {
+                    engineGain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+                    bAudioEnabled = true;
+                    document.getElementById('btn-audio').innerText = "Engine Audio: ON";
+                }
+            }
+        }
+
+        // -------------------------------------------------------------
+        // 2-WHEEL MOTORCYCLE CHAOS PHYSICS
+        // -------------------------------------------------------------
+        function SimulateMotorcyclePhysics(dt) {
+            if (dt <= 0 || bCrashed) {
+                if (bCrashed) {
+                    crashTimer += dt;
+                    if (crashTimer > 3.0) {
+                        ResetBike();
+                    }
+                }
+                return;
+            }
+
+            // 1. Vehicle Direction Vectors
+            const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(rotation);
+            const right = new THREE.Vector3(1, 0, 0).applyQuaternion(rotation);
+            const up = new THREE.Vector3(0, 1, 0).applyQuaternion(rotation);
+
+            acceleration.copy(linearVelocity).sub(prevVelocity).divideScalar(dt);
+            prevVelocity.copy(linearVelocity);
+
+            const speed = linearVelocity.length();
+            const forwardSpeed = linearVelocity.dot(forward);
+
+            // 2. Dynamic Longitudinal Weight Shift (DeltaFz = m * a_x * (h / L))
+            const longAccel = acceleration.dot(forward);
+            const deltaLoadZ = TotalMass * longAccel * (CoMHeight / Wheelbase);
+
+            const staticWheelLoad = (TotalMass * 9.81) * 0.5; // ~1324 N
+            const frontLoad = Math.max(0, staticWheelLoad - deltaLoadZ);
+            const rearLoad = Math.max(0, staticWheelLoad + deltaLoadZ);
+
+            // Natural Wheelie & Stoppie Conditions
+            isWheelie = (frontLoad <= 20.0 && forwardSpeed > 2.0 && keys.throttle);
+            isStoppie = (rearLoad <= 20.0 && forwardSpeed > 4.0 && keys.frontBrake);
+
+            // 3. 6-Speed Engine RPM & Rear Wheel Drive Torque
+            const gearRatio = GearRatios[currentGear];
+            const totalDriveRatio = gearRatio * PrimaryRatio * FinalRatio;
+
+            // Rear wheel rotation speed
+            const rearWheelRPM = (linearVelocity.dot(forward) / (2 * Math.PI * WheelRadius)) * 60.0;
+            const drivenRPM = Math.abs(rearWheelRPM * totalDriveRatio);
+
+            const targetRPM = Math.max(IdleRPM, drivenRPM);
+            currentRPM = THREE.MathUtils.lerp(currentRPM, targetRPM, 0.2);
+
+            // Automatic Transmission shifting
+            if (bAutoTransmission) {
+                if (currentRPM > 13800 && currentGear < 6) {
+                    currentGear++;
+                } else if (currentRPM < 5500 && currentGear > 1) {
+                    currentGear--;
+                }
+            }
+
+            // Engine Flywheel Torque (~118 Nm peak at 11,000 RPM)
+            const torqueNorm = Math.min(1.4, (currentRPM - IdleRPM) / (11000 - IdleRPM));
+            const engineTorque = Math.sin(Math.min(1.57, torqueNorm * 1.57)) * 118.0;
+
+            let driveForceN = 0;
+            if (keys.throttle && !isWheelie) {
+                const axleTorque = engineTorque * totalDriveRatio;
+                driveForceN = axleTorque / WheelRadius;
+            }
+
+            // Braking Forces (70% Front, 30% Rear)
+            let brakeForceN = 0;
+            if (keys.frontBrake) brakeForceN += 4200.0; // Front dual discs
+            if (keys.rearBrake) brakeForceN += 1600.0;  // Rear single disc
+
+            // Engine braking
+            if (!keys.throttle && speed > 2.0) {
+                brakeForceN += 450.0 * (currentRPM / RedlineRPM);
+            }
+
+            // 4. Pacejka Tire Ground Forces
+            const totalForces = new THREE.Vector3();
+            const totalTorque = new THREE.Vector3();
+
+            // Drive / Brake force applied along wheel heading
+            if (driveForceN > 0) {
+                totalForces.add(forward.clone().multiplyScalar(driveForceN));
+            }
+            if (brakeForceN > 0 && speed > 0.1) {
+                totalForces.add(linearVelocity.clone().normalize().multiplyScalar(-brakeForceN));
+            }
+
+            // 5. Dynamic Motorcycle Leaning: lean = atan(a_lateral / g)
+            const latAccel = acceleration.dot(right);
+            let steerInput = 0;
+            if (keys.left) steerInput += 1;
+            if (keys.right) steerInput -= 1;
+
+            const speedFactor = Math.min(1.0, Math.abs(forwardSpeed) / 55.0);
+            const dynLeanRad = Math.atan2(latAccel, 9.81);
+            const cmdLeanRad = THREE.MathUtils.degToRad(steerInput * MaxLeanDeg * speedFactor);
+            const targetRollRad = THREE.MathUtils.clamp(dynLeanRad * 0.45 + cmdLeanRad * 0.55, -THREE.MathUtils.degToRad(MaxLeanDeg), THREE.MathUtils.degToRad(MaxLeanDeg));
+
+            targetLeanDeg = THREE.MathUtils.radToDeg(targetRollRad);
+
+            // Measure actual roll angle
+            const currentRollRad = Math.asin(THREE.MathUtils.clamp(right.dot(new THREE.Vector3(0, 1, 0)), -1, 1));
+            currentLeanDeg = THREE.MathUtils.radToDeg(currentRollRad);
+
+            // Direct yaw steering + Roll lean torque
+            const yawTorqueMag = steerInput * 2800 * (1.0 - 0.65 * speedFactor);
+            totalTorque.add(up.clone().multiplyScalar(yawTorqueMag));
+
+            const rollTorqueMag = (targetRollRad - currentRollRad) * 4200 - angularVelocity.dot(forward) * 550;
+            totalTorque.add(forward.clone().multiplyScalar(rollTorqueMag));
+
+            // Pitch Torque for Wheelies / Stoppies
+            if (isWheelie) {
+                totalTorque.add(right.clone().multiplyScalar(650.0)); // Pitch up
+            } else if (isStoppie) {
+                totalTorque.add(right.clone().multiplyScalar(-750.0)); // Pitch down onto front wheel
+            }
+
+            // 6. Aerodynamic Drag (Cd*A * 0.5 * rho * v^2)
+            const cdA = (speed * 3.6 > 160) ? 0.32 : 0.45; // Tucked in vs upright
+            const dragMag = 0.5 * 1.225 * (speed * speed) * cdA;
+            if (speed > 0.1) {
+                totalForces.add(linearVelocity.clone().normalize().multiplyScalar(-dragMag));
+            }
+
+            // Gravity
+            totalForces.add(new THREE.Vector3(0, -9.81 * TotalMass, 0));
+
+            // 7. Numerical Integration
+            const linAcc = totalForces.divideScalar(TotalMass);
+            linearVelocity.add(linAcc.multiplyScalar(dt));
+            position.add(linearVelocity.clone().multiplyScalar(dt));
+
+            const angAcc = totalTorque.divideScalar(TotalMass * 0.4);
+            angularVelocity.add(angAcc.multiplyScalar(dt));
+
+            const qDelta = new THREE.Quaternion(angularVelocity.x * dt * 0.5, angularVelocity.y * dt * 0.5, angularVelocity.z * dt * 0.5, 0);
+            qDelta.multiply(rotation);
+            rotation.x += qDelta.x;
+            rotation.y += qDelta.y;
+            rotation.z += qDelta.z;
+            rotation.w += qDelta.w;
+            rotation.normalize();
+
+            // 8. Road Surface Ground Collision Clamp
+            const roadSample = SampleRoadSurface(position);
+            const targetRoadY = roadSample.height + 0.35; // Tire radius ground offset
+            if (position.y < targetRoadY) {
+                position.y = THREE.MathUtils.lerp(position.y, targetRoadY, 0.4);
+                if (linearVelocity.y < 0) linearVelocity.y = 0;
+            }
+
+            // Wheel Spin Animation
+            frontWheelRot += (forwardSpeed / WheelRadius) * dt;
+            rearWheelRot += (forwardSpeed / WheelRadius) * dt;
+
+            // 9. Crash Detection: Low-Side Over-Lean
+            if (Math.abs(currentLeanDeg) > MaxLeanDeg + 5.0 && speed * 3.6 > 40) {
+                TriggerCrash();
+            }
+        }
+
+        function TriggerCrash() {
+            if (bCrashed) return;
+            bCrashed = true;
+            crashTimer = 0.0;
+            document.getElementById('crash-banner').style.display = "block";
+            // Bike slides on its side
+            angularVelocity.set(0, 0, 0);
+        }
+
+        // -------------------------------------------------------------
+        // VISUALS & DYNAMIC CHASE CAMERA
+        // -------------------------------------------------------------
+        function UpdateVisuals(dt) {
+            bikeGroup.position.copy(position);
+            bikeGroup.quaternion.copy(rotation);
+
+            // Spin Front & Rear Rubber Tires
+            frontWheelMesh.rotation.x = frontWheelRot;
+            rearWheelMesh.rotation.x = rearWheelRot;
+
+            // Steer Front Fork
+            let steerVisual = 0;
+            if (keys.left) steerVisual += 0.28;
+            if (keys.right) steerVisual -= 0.28;
+            frontForkGroup.rotation.y = THREE.MathUtils.lerp(frontForkGroup.rotation.y, steerVisual, 0.2);
+
+            // Rider Body Hang-Off & Knee-Down Animation
+            const leanRatio = currentLeanDeg / MaxLeanDeg;
+            riderTorso.rotation.z = -leanRatio * 0.45; // Torso shifts inside corner
+            riderTorso.position.x = -leanRatio * 0.18;
+
+            // Knee Extension on aggressive lean
+            if (currentLeanDeg > 28) {
+                riderRightLeg.rotation.z = THREE.MathUtils.degToRad(-35); // Knee out right
+            } else if (currentLeanDeg < -28) {
+                riderLeftLeg.rotation.z = THREE.MathUtils.degToRad(35);   // Knee out left
+            } else {
+                riderLeftLeg.rotation.z = 0;
+                riderRightLeg.rotation.z = 0;
+            }
+
+            // Dynamic Motorcycle Camera
+            const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(rotation);
+            const up = new THREE.Vector3(0, 1, 0).applyQuaternion(rotation);
+            const speedKmh = linearVelocity.length() * 3.6;
+
+            if (cameraMode === 0) {
+                // Chase Cam (Smooth follow, roll tilt absorption)
+                const boomDist = isWheelie ? 4.8 : 3.8;
+                const camTargetPos = position.clone().sub(forward.clone().multiplyScalar(boomDist)).add(up.clone().multiplyScalar(1.5));
+                camera.position.lerp(camTargetPos, 0.16);
+
+                const lookTarget = position.clone().add(forward.clone().multiplyScalar(6.0));
+                camera.lookAt(lookTarget);
+
+                // Dynamic FOV with speed (80 to 102 degrees)
+                const targetFOV = THREE.MathUtils.lerp(80, 102, Math.min(1.0, speedKmh / 280.0));
+                camera.fov = THREE.MathUtils.lerp(camera.fov, targetFOV, 0.1);
+                camera.updateProjectionMatrix();
+            } else if (cameraMode === 1) {
+                // Cockpit FPV (Behind Windscreen)
+                const cockpitPos = position.clone().add(up.clone().multiplyScalar(0.7)).add(forward.clone().multiplyScalar(0.3));
+                camera.position.copy(cockpitPos);
+                camera.lookAt(cockpitPos.clone().add(forward.clone().multiplyScalar(25.0)));
+            } else {
+                // Drone / Replay Cam
+                camera.position.set(position.x - 8, position.y + 5, position.z - 8);
+                camera.lookAt(position);
+            }
+        }
+
+        // -------------------------------------------------------------
+        // HUD UPDATE
+        // -------------------------------------------------------------
+        function UpdateHUD() {
+            const speedKmh = Math.round(linearVelocity.length() * 3.6);
+            document.getElementById('hud-speed').innerText = speedKmh;
+
+            document.getElementById('hud-gear').innerText = currentGear;
+            document.getElementById('hud-rpm').innerText = Math.round(currentRPM).toLocaleString();
+
+            const rpmNorm = Math.min(1.0, (currentRPM - IdleRPM) / (MaxRPM - IdleRPM));
+            document.getElementById('tach-fill').style.width = Math.round(rpmNorm * 100) + '%';
+
+            // Shift Lights
+            document.getElementById('sl-1').className = 'shift-light-dot green' + (currentRPM > 9000 ? ' on' : '');
+            document.getElementById('sl-2').className = 'shift-light-dot green' + (currentRPM > 10500 ? ' on' : '');
+            document.getElementById('sl-3').className = 'shift-light-dot yellow' + (currentRPM > 12000 ? ' on' : '');
+            document.getElementById('sl-4').className = 'shift-light-dot yellow' + (currentRPM > 13000 ? ' on' : '');
+            document.getElementById('sl-5').className = 'shift-light-dot red' + (currentRPM > 14000 ? ' on' : '');
+            document.getElementById('sl-6').className = 'shift-light-dot red' + (currentRPM > 14600 ? ' on' : '');
+
+            // Brake Bars
+            const frontBrakePct = keys.frontBrake ? 100 : 0;
+            const rearBrakePct = keys.rearBrake ? 100 : 0;
+            document.getElementById('front-brake-bar').style.width = frontBrakePct + '%';
+            document.getElementById('front-brake-val').innerText = frontBrakePct + '%';
+            document.getElementById('rear-brake-bar').style.width = rearBrakePct + '%';
+            document.getElementById('rear-brake-val').innerText = rearBrakePct + '%';
+
+            // Telemetry Cards
+            document.getElementById('hud-lean-deg').innerText = Math.abs(currentLeanDeg).toFixed(1) + '°';
+            document.getElementById('hud-lean').innerText = Math.abs(currentLeanDeg).toFixed(0) + '° / 58°';
+            document.getElementById('hud-throttle').innerText = (keys.throttle ? '100%' : '0%');
+
+            const wheelieElem = document.getElementById('hud-wheelie');
+            wheelieElem.innerText = isWheelie ? "ACTIVE!" : "NO";
+            wheelieElem.className = 'val ' + (isWheelie ? "warn" : "");
+
+            const stoppieElem = document.getElementById('hud-stoppie');
+            stoppieElem.innerText = isStoppie ? "ACTIVE!" : "NO";
+            stoppieElem.className = 'val ' + (isStoppie ? "alert" : "");
+        }
+
+        // -------------------------------------------------------------
+        // CONTROLS & GEARBOX
+        // -------------------------------------------------------------
+        function OnKeyDown(e) {
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            if (e.code === 'KeyW' || e.code === 'ArrowUp') keys.throttle = true;
+            if (e.code === 'KeyS' || e.code === 'ArrowDown') keys.frontBrake = true;
+            if (e.code === 'Space') keys.rearBrake = true;
+            if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.left = true;
+            if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.right = true;
+
+            if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+                if (currentGear < 6) {
+                    currentGear++;
+                }
+            }
+            if (e.code === 'ControlLeft' || e.code === 'ControlRight') {
+                if (currentGear > 1) {
+                    currentGear--;
+                }
+            }
+            if (e.code === 'KeyM') ToggleTransmission();
+            if (e.code === 'KeyR') ResetBike();
+            if (e.code === 'KeyC') CycleCamera();
+        }
+
+        function OnKeyUp(e) {
+            if (e.code === 'KeyW' || e.code === 'ArrowUp') keys.throttle = false;
+            if (e.code === 'KeyS' || e.code === 'ArrowDown') keys.frontBrake = false;
+            if (e.code === 'Space') keys.rearBrake = false;
+            if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.left = false;
+            if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.right = false;
+        }
+
+        function CycleCamera() {
+            cameraMode = (cameraMode + 1) % 3;
+            const names = ["Chase (C)", "Cockpit (C)", "Drone (C)"];
+            document.getElementById('btn-camera').innerText = `Camera: ${names[cameraMode]}`;
+        }
+
+        function ToggleTransmission() {
+            bAutoTransmission = !bAutoTransmission;
+            document.getElementById('btn-trans').innerText = `Gearbox: ${bAutoTransmission ? "AUTO (M)" : "MANUAL (M)"}`;
+        }
+
+        function ResetBike() {
+            bCrashed = false;
+            document.getElementById('crash-banner').style.display = "none";
+            position.set(0, 0.45, -20);
+            rotation.set(0, 0, 0, 1);
+            linearVelocity.set(0, 0, 0);
+            angularVelocity.set(0, 0, 0);
+            prevVelocity.set(0, 0, 0);
+            currentGear = 1;
+            currentRPM = IdleRPM;
+        }
+
+        function OnWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        window.onload = Init;
+    </script>
+</body>
+</html>
